@@ -1,0 +1,73 @@
+#include <dt-bindings/interconnect/qcom,kalama.h>
+
+&tlmm {
+	cnss_pins {
+		cnss_wlan_en_active: cnss_wlan_en_active {
+			mux {
+				pins = "gpio80";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio80";
+				drive-strength = <16>;
+				output-high;
+				bias-pull-up;
+			};
+		};
+
+		cnss_wlan_en_sleep: cnss_wlan_en_sleep {
+			mux {
+				pins = "gpio80";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio80";
+				drive-strength = <2>;
+				output-low;
+				bias-pull-down;
+			};
+		};
+	};
+};
+
+&reserved_memory {
+	cnss_wlan_mem: cnss_wlan_region {
+		compatible = "shared-dma-pool";
+		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
+		reusable;
+		alignment = <0x0 0x400000>;
+		size = <0x0 0x2000000>;
+	};
+};
+
+&soc {
+	wlan: qcom,cnss-qca-converged {
+		compatible = "qcom,cnss-qca-converged";
+		reg = <0xb0000000 0x10000>;
+		reg-names = "smmu_iova_ipa";
+		qcom,converged-dt;
+		qcom,wlan-sw-ctrl-gpio = <&tlmm 83 0>;
+
+		chip_cfg@0 {
+			supported-ids = <0x1103>;
+			wlan-en-gpio = <&tlmm 80 0>;
+			qcom,bt-en-gpio = <&tlmm 81 0>;
+			qcom,sw-ctrl-gpio = <&tlmm 82 0>;
+			pinctrl-names = "wlan_en_active", "wlan_en_sleep";
+			pinctrl-0 = <&cnss_wlan_en_active>;
+			pinctrl-1 = <&cnss_wlan_en_sleep>;
+			qcom,wlan;
+			qcom,wlan-rc-num = <1>;
+			qcom,rc-ep-short-channel;
+			qcom,wlan-ramdump-dynamic = <0x420000>;
+			qcom,wlan-cbc-enabled;
+			cnss-enable-self-recovery;
+			use-pm-domain;
+			mboxes = <&qmp_aop 0>;
+			qcom,vreg_ol_cpr ="s2g";
+
+			vdd-wlan-aon-supply = <&S2G>;
+			qcom,vdd-wlan-aon-config = <1012000 1012000 0 0 1>;
+			vdd
