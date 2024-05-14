@@ -91,6 +91,12 @@ config USB_PCI
 	  If you have such a device you may say N here and PCI related code
 	  will not be built in the USB driver.
 
+config NUBIA_USB
+	bool "nubia USB test support"
+	default m
+	help
+	  nubia usb
+
 if USB
 
 source "drivers/usb/core/Kconfig"

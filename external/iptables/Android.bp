@@ -49,7 +49,9 @@ cc_library_headers {
 
 cc_defaults {
     name: "iptables_defaults",
-
+    // zte-modify, modify for FOR_ZTE_CELL, network, begin
+    defaults: ["FEATURE_GLOBAL_CFLAGS"],
+    // zte-modify, modify for FOR_ZTE_CELL, network, end
     cflags: [
         "-D_LARGEFILE_SOURCE=1",
         "-D_LARGE_FILES",

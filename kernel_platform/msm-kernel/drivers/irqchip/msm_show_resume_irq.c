@@ -394,6 +394,9 @@ void signal_catch_for_freeze(void *data, int sig, struct task_struct *killer, st
 			pr_warn("send_unfreeze_event cgroup2 signal = %d  %d  %d\n", sig, dst->real_cred->uid.val, dst->pid);
 		}
 	}
+	if ((sig == SIGSTOP || sig == SIGTSTP) && NULL != dst) {
+		pr_warn("SIGSTOP SIGTSTP signal = %d  %d  %d\n", sig, dst->real_cred->uid.val, dst->pid);
+	}
 }
 static const struct attribute_group unfreeze_event_attr_group = {
 	.attrs = (struct attribute **) unfreeze_event_attr,

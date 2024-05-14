@@ -84,7 +84,7 @@ int dw9784_hi847_wait_check_register(void *data, int addr, uint32_t value)
 				return FUNC_FAIL;
 			}
 		}
-        mdelay(100);
+		mdelay(100);
 	}
 	return FUNC_PASS;
 }
@@ -112,6 +112,7 @@ void ois_reset_ois_dw9784_hi847(void *data)
 int calibration_save_ois_dw9784_hi847(void *data)
 {
 	pr_info("%s:%d: [dw9784_hi847_calibration_save_ois_dw9784_hi847] calibration save starting", __func__, __LINE__);
+	RamWrite16A_ois_dw9784_hi847(data, 0x7012, 0x000A);  // Set store mode
 
 	//When store is done, status changes to 0x6001
 	if (dw9784_hi847_wait_check_register(data, 0x7010, 0x6001) == FUNC_PASS) {
@@ -175,6 +176,8 @@ int ois_dw9784_hi847_debugfs_cal_s(void *data)
 	RamRead16A_ois_dw9784_hi847(data, 0x7180, &xOffset);  /* x gyro offset */
 	RamRead16A_ois_dw9784_hi847(data, 0x7181, &yOffset);  /* y gyro offset */
 	RamRead16A_ois_dw9784_hi847(data, 0x7195, &status);  /* gyro offset status */
+	pr_info("%s:%d:[dw9784_gyro_offset_calibrtion] xOffset: 0x%04X, yOffset : 0x%04X Status = 0x%04X",
+		__func__, __LINE__, xOffset, yOffset, status);
 
 	/* Read Gyro offset cailbration result status */
 	if ((status & 0x8000)== 0x8000) {
@@ -218,7 +221,6 @@ int ois_dw9784_hi847_debugfs_cal_s(void *data)
 			msg = calibration_save_ois_dw9784_hi847(data);
 			ptr->cal_info.cal_success = 1;
 		}
-		return msg;
 	}
 	else {
 		pr_err("[dw9784_hi847_gyro_ofs_calibration] x/y gyro ofs calibration done fail");
@@ -228,6 +230,8 @@ int ois_dw9784_hi847_debugfs_cal_s(void *data)
 	pr_info("%s:%d:[dw9784_hi847_gyro_offset_calibrtion] msg : %d", __func__, __LINE__, msg);
 	pr_info("%s:%d:[dw9784_hi847_gyro_offset_calibrtion] x_gyro_offset: 0x%04X, y_gyro_offset : 0x%04X", __func__, __LINE__, xOffset, yOffset);
 	pr_info("%s:%d:[dw9784_hi847_gyro_offset_calibrtion] gyro_offset_calibrtion finished...Status = 0x%04X", __func__, __LINE__, status);
+
+	return msg;
 }
 
 int ois_dw9784_hi847_debugfs_cal_g(void *data, u64 *val)

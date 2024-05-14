@@ -489,11 +489,7 @@ static ssize_t st21nfc_dev_read(struct file *filp, char __user *buf,
 	/* Read data */
 	ret = i2c_master_recv(st21nfc_dev->client, st21nfc_dev->buffer, count);
 
-  	/*
-	Error when ret=-107 can be ignored in ZLOG_NFC_I2C_READ_ERROR_NO.
-	This is an error that will be reported during the initial connection with i2c.
-	*/
-	if(ret < 0 && ret != -107){
+	if(ret < 0){
 #ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
 		if(zlog_st21nfc_client){
 			zlog_client_record(zlog_st21nfc_client, "stn21fc i2c master receive error ret=%d", ret);

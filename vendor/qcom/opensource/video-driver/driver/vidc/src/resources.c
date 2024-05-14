@@ -1318,7 +1318,7 @@ static int __disable_unprepare_clock(struct msm_vidc_core *core,
 		if (cl->has_scaling)
 			__set_clk_rate(core, cl, 0);
 		cl->prev = 0;
-		d_vpr_h("%s: clock %s disable unprepared\n", __func__, cl->name);
+		d_vpr_e("%s: clock %s disable unprepared\n", __func__, cl->name);
 		break;
 	}
 	if (!found) {
@@ -1379,7 +1379,7 @@ static int __prepare_enable_clock(struct msm_vidc_core *core,
 				__set_clk_rate(core, cl, 0);
 			return -EINVAL;
 		}
-		d_vpr_h("%s: clock %s prepare enabled\n", __func__, cl->name);
+		d_vpr_e("%s: clock %s prepare enabled\n", __func__, cl->name);
 		break;
 	}
 	if (!found) {
@@ -1445,7 +1445,7 @@ static int __reset_control_acquire_name(struct msm_vidc_core *core,
 		const char *name)
 {
 	struct reset_info *rcinfo = NULL;
-	int rc = 0;
+	int rc = 0, count = 0;
 	bool found = false;
 
 	venus_hfi_for_each_reset_clock(core, rcinfo) {
@@ -1460,9 +1460,28 @@ static int __reset_control_acquire_name(struct msm_vidc_core *core,
 		}
 
 		found = true;
+		d_vpr_e("%s: acquire reset control (%s)\n",
+			__func__, rcinfo->name);
 		/* reset_control_acquire is exposed in kernel version 6 */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
-		rc = reset_control_acquire(rcinfo->rst);
+		do {
+			rc = reset_control_acquire(rcinfo->rst);
+			if (!rc) {
+				break;
+			} else {
+				d_vpr_e(
+					"%s: failed to acquire video_xo_reset control, count %d\n",
+					__func__, count);
+				count++;
+				usleep_range(1000, 1000);
+			}
+		} while (count < 1000);
+
+		if (count >= 1000) {
+			d_vpr_e("%s: timeout acquiring video_xo_reset\n", __func__);
+			rc = -EINVAL;
+			MSM_VIDC_FATAL(true);
+		}
 #else
 		rc = -EINVAL;
 #endif
@@ -1470,7 +1489,7 @@ static int __reset_control_acquire_name(struct msm_vidc_core *core,
 			d_vpr_e("%s: failed to acquire reset control (%s), rc = %d\n",
 				__func__, rcinfo->name, rc);
 		else
-			d_vpr_h("%s: acquire reset control (%s)\n",
+			d_vpr_e("%s: acquire reset control (%s) Done\n",
 				__func__, rcinfo->name);
 		break;
 	}
@@ -1501,6 +1520,8 @@ static int __reset_control_release_name(struct msm_vidc_core *core,
 		}
 
 		found = true;
+		d_vpr_e("%s: release reset control (%s)\n",
+			__func__, rcinfo->name);
 		/* reset_control_release exposed in kernel version 6 */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 		reset_control_release(rcinfo->rst);
@@ -1511,7 +1532,7 @@ static int __reset_control_release_name(struct msm_vidc_core *core,
 			d_vpr_e("%s: release reset control (%s) failed\n",
 				__func__, rcinfo->name);
 		else
-			d_vpr_h("%s: release reset control (%s) done\n",
+			d_vpr_e("%s: release reset control (%s) done\n",
 				__func__, rcinfo->name);
 		break;
 	}
@@ -1535,12 +1556,13 @@ static int __reset_control_assert_name(struct msm_vidc_core *core,
 			continue;
 
 		found = true;
+		d_vpr_e("%s: assert reset control (%s)\n", __func__, rcinfo->name);
 		rc = reset_control_assert(rcinfo->rst);
 		if (rc)
 			d_vpr_e("%s: failed to assert reset control (%s), rc = %d\n",
 				__func__, rcinfo->name, rc);
 		else
-			d_vpr_h("%s: assert reset control (%s)\n",
+			d_vpr_e("%s: assert reset control (%s) Done\n",
 				__func__, rcinfo->name);
 		break;
 	}
@@ -1563,12 +1585,14 @@ static int __reset_control_deassert_name(struct msm_vidc_core *core,
 		if (strcmp(rcinfo->name, name))
 			continue;
 		found = true;
+		d_vpr_e("%s: deassert reset control (%s)\n",
+				__func__, rcinfo->name);
 		rc = reset_control_deassert(rcinfo->rst);
 		if (rc)
 			d_vpr_e("%s: deassert reset control for (%s) failed, rc %d\n",
 					__func__, rcinfo->name, rc);
 		else
-			d_vpr_h("%s: deassert reset control (%s)\n",
+			d_vpr_e("%s: deassert reset control (%s) Done\n",
 					__func__, rcinfo->name);
 		break;
 	}

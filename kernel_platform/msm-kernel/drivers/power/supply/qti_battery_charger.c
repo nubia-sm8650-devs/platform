@@ -756,13 +756,15 @@ static void zte_log_chg_err(char *log_buf)
 		zlog_client_record(zlog_chg_client, "BATTMNGR_DRV_BATT_OV_EVENT");
 		zlog_client_notify(zlog_chg_client, ZLOG_CHG_VBAT_OVP);
 	}
-	
+
+#if 0
 	if(strnstr(log_buf,"BATTMNGR_DRV_USBIN_FAULT_EVENT",ZTE_BUF_SIZE))
 	{
 		zlog_client_record(zlog_chg_client, "Servicing BATTMNGR_DRV_USBIN_FAULT_EVENT");
 		zlog_client_notify(zlog_chg_client, ZLOG_CHG_USBIN_FAULT);
 	}
-	
+#endif
+  
 	if(strnstr(log_buf,"Hardreset",ZTE_BUF_SIZE))
 	{
 		zlog_client_record(zlog_chg_client, "Servicing Hardreset");

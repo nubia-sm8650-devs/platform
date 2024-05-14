@@ -5076,6 +5076,7 @@ int dsi_panel_disable(struct dsi_panel *panel)
 	panel->power_mode = SDE_MODE_DPMS_OFF;
 	panel->disp_feature->zte_lcd_hbm = 0;
 	panel->disp_feature->zte_lcd_hdr = 0;
+	panel->disp_feature->zte_lcd_acl = 0;
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }

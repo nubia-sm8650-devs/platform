@@ -290,7 +290,7 @@ static void __camera_exit(int i, int j)
 	}
 }
 
-extern int stmvl53l1_init(void);
+//extern int stmvl53l1_init(void);
 extern void stmvl53l1_exit(void);
 
 extern bool tof_enable;
@@ -326,12 +326,6 @@ static int camera_init(void)
 		}
 	}
 
-	if(tof_enable){
-		/* add tof modules begin*/
-		pr_info("TOF_stmvl53l1_init");
-		stmvl53l1_init();
-		/* add tof modules end*/
-	}
 	CAM_DBG(CAM_UTIL, "Camera initcalls done");
     
 end_init:

@@ -14,6 +14,10 @@
 #include "cam_soc_util.h"
 
 bool tof_enable = false;
+bool tof_inited = false;
+
+extern int stmvl53l1_init(void);
+
 
 int32_t cam_sensor_get_sub_module_index(struct device_node *of_node,
 	struct cam_sensor_board_info *s_info)
@@ -26,6 +30,14 @@ int32_t cam_sensor_get_sub_module_index(struct device_node *of_node,
 	sensor_info = s_info;
 	
 	tof_enable = of_property_read_bool(of_node, "zte-tof-enable");
+
+    if(tof_enable && tof_inited == false){
+		/* add tof modules begin*/
+		CAM_DBG(CAM_SENSOR, "TOF_stmvl53l1_init");
+		stmvl53l1_init();
+		tof_inited = true; 
+		/* add tof modules end*/
+    }
 
 	for (i = 0; i < SUB_MODULE_MAX; i++)
 		sensor_info->subdev_id[i] = -1;
