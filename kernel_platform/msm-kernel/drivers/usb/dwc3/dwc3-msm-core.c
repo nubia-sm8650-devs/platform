@@ -217,12 +217,6 @@
 /* USB repeater */
 #define USB_REPEATER_V1		0x1
 
-#ifdef CONFIG_NUBIA_USB
-struct dwc3_msm *nubia_mdwc ;
-struct kobject *enhance_kobj;
-EXPORT_SYMBOL(enhance_kobj);
-#endif
-
 enum dbm_reg {
 	DBM_EP_CFG,
 	DBM_DATA_FIFO,
@@ -5960,31 +5954,6 @@ static int dwc3_msm_parse_core_params(struct dwc3_msm *mdwc, struct device_node 
 	return ret;
 }
 
-
-#ifdef CONFIG_NUBIA_USB
-static ssize_t usb30_show(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-	struct dwc3 *dwc = NULL;
-	dwc = platform_get_drvdata(nubia_mdwc->dwc3);
-
-	if(dwc->gadget == NULL)
-			return scnprintf(buf, PAGE_SIZE, "none\n");
-	if (dwc->gadget->speed == USB_SPEED_SUPER_PLUS)
-			return scnprintf(buf, PAGE_SIZE, "USB31\n");
-	else if (dwc->gadget->speed == USB_SPEED_SUPER)
-			return scnprintf(buf, PAGE_SIZE, "USB30\n");
-	else if (dwc->gadget->speed == USB_SPEED_HIGH)
-			return scnprintf(buf, PAGE_SIZE, "USB20\n");
-	else
-			return scnprintf(buf, PAGE_SIZE, "none\n");
-}
-
-static struct kobj_attribute usb_test_attrs[] = {
-	__ATTR(usb30, 0664, usb30_show, NULL),
-};
-#endif
-
 static int dwc3_msm_interconnect_vote_populate(struct dwc3_msm *mdwc)
 {
 	int ret_nom = 0, i = 0, j = 0, count = 0;
@@ -6141,9 +6110,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret = 0, i;
 	u32 val;
-#ifdef CONFIG_NUBIA_USB
-	int attr_count;
-#endif
 
 	mdwc = devm_kzalloc(&pdev->dev, sizeof(*mdwc), GFP_KERNEL);
 	if (!mdwc)
@@ -6437,21 +6403,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "fail to setup lpm_test_device\n");
 	}
-
-#ifdef CONFIG_NUBIA_USB
-	nubia_mdwc = mdwc;
-	if (enhance_kobj == NULL) {
-		pr_err("nubia enhance_kobj init in %s\n", __func__);
-		enhance_kobj = kobject_create_and_add("usb_enhance", kernel_kobj);
-		if (!enhance_kobj)
-			pr_err("nubia enhance_kobj creat failed in %s\n", __func__);
-	}
-	for (attr_count = 0; attr_count < ARRAY_SIZE(usb_test_attrs); attr_count++) {
-		ret = sysfs_create_file(enhance_kobj, &usb_test_attrs[attr_count].attr);
-		if (ret)
-			pr_err("nubia create_file filed in %s\n", __func__);
-	}
-#endif
 	return 0;
 
 put_dwc3:
