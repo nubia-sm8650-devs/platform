@@ -182,8 +182,8 @@
 		cam_vaf-supply = <&L3M>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
-		rgltr-min-voltage = <2704000>;
-		rgltr-max-voltage = <3000000>;
+		rgltr-min-voltage = <3200000>;
+		rgltr-max-voltage = <3200000>;
 		rgltr-load-current = <103000>;
 	};
 
@@ -209,8 +209,8 @@
 		cam_clk-supply = <&cam_cc_titan_top_gdsc>;
 		regulator-names = "cam_vaf", "cam_v_custom1", "cam_clk";
 		rgltr-cntrl-support;
-		rgltr-min-voltage = <2704000 2960000 0>;
-		rgltr-max-voltage = <3000000 2960000 0>;
+		rgltr-min-voltage = <3200000 3300000 0>;
+		rgltr-max-voltage = <3200000 3300000 0>;
 		rgltr-load-current = <103000 90000 0>;
 	};
 
@@ -239,8 +239,8 @@
 		cam_clk-supply = <&cam_cc_titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_vdig", "cam_vaf", "cam_v_custom1", "cam_clk";
 		rgltr-cntrl-support;
-		rgltr-min-voltage = <1800000 1104000 2704000 2960000 0>;
-		rgltr-max-voltage = <1800000 1104000 3000000 2960000 0>;
+		rgltr-min-voltage = <1800000 1104000 3200000 3300000 0>;
+		rgltr-max-voltage = <1800000 1104000 3200000 3300000 0>;
 		rgltr-load-current = <3500 140000 103000 90000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
@@ -440,8 +440,8 @@
 		cam_clk-supply = <&cam_cc_titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_vdig", "cam_vaf", "cam_v_custom1", "cam_clk";
 		rgltr-cntrl-support;
-		rgltr-min-voltage = <1800000 1104000 2704000 2960000 0>;
-		rgltr-max-voltage = <1800000 1104000 3000000 2960000 0>;
+		rgltr-min-voltage = <1800000 1104000 3200000 3300000 0>;
+		rgltr-max-voltage = <1800000 1104000 3200000 3300000 0>;
 		rgltr-load-current = <3500 140000 103000 90000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
@@ -548,8 +548,8 @@
 		cam_clk-supply = <&cam_cc_titan_top_gdsc>;
 		regulator-names = "cam_vio", "cam_vdig", "cam_clk";
 		rgltr-cntrl-support;
-		rgltr-min-voltage = <1800000 1056000 0>;
-		rgltr-max-voltage = <1800000 1056000 0>;
+		rgltr-min-voltage = <1800000 1100000 0>;
+		rgltr-max-voltage = <1800000 1100000 0>;
 		rgltr-load-current = <3500 140000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";

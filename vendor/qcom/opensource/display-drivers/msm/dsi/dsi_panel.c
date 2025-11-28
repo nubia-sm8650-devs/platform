@@ -19,6 +19,9 @@
 #include "sde_vdc_helper.h"
 #include "../zte_disp/zte_panel_backlight.h"
 #include "../zte_disp/zte_panel_work.h"
+#ifdef CONFIG_ZTE_LCD_USE_I2C
+#include "../zte_disp/zte_disp_i2c.h"
+#endif
 
 /**
  * topology is currently defined by a set of following 3 values:
@@ -294,9 +297,33 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 skip_reset_gpio:
 	if (gpio_is_valid(panel->bl_config.en_gpio)) {
 		rc = gpio_direction_output(panel->bl_config.en_gpio, 1);
+            /* Started by AICoder, pid:w3d25nc613h14ee146c40b63c0c3a80c75569e5c */
+                usleep_range(1000, 1100);    // Delay for 1000us to 1100us
+            /* Ended by AICoder, pid:w3d25nc613h14ee146c40b63c0c3a80c75569e5c */
 		if (rc)
 			DSI_ERR("unable to set dir for bklt gpio rc=%d\n", rc);
 	}
+
+/* Started by AICoder, pid:naca48ff0agc474148680a232056191dd4830382 */
+#ifdef CONFIG_ZTE_LCD_USE_I2C
+    /* add by zte to load lp8556 i2c begin*/
+    zte_disp_set_cmds(0x9E, 0x22, lp8556_device);
+    zte_disp_set_cmds(0xA9, 0x80, lp8556_device);
+    zte_disp_set_cmds(0xA1, 0x4F, lp8556_device);
+    zte_disp_set_cmds(0xA2, 0x28, lp8556_device);
+    zte_disp_set_cmds(0x00, 0xFF, lp8556_device);
+    zte_disp_set_cmds(0x01, 0x01, lp8556_device);
+    zte_disp_set_cmds(0x16, 0x1F, lp8556_device);
+    //zte_disp_set_cmds(0xA0, 0xFF, lp8556_device);
+    //zte_disp_set_cmds(0xA5, 0x04, lp8556_device);
+    /* add by zte to load lp8556 i2c end*/
+	usleep_range(1000, 1100);
+	zte_disp_set_cmds(0x00, 0x14, AW37504_device);// add by zte for AW37504 and SM5119CF
+	zte_disp_set_cmds(0x01, 0x14, AW37504_device);
+	zte_disp_set_cmds(0x03, 0x4f, AW37504_device);
+	zte_disp_set_cmds(0x04, 0x09, AW37504_device);
+#endif
+/* Ended by AICoder, pid:naca48ff0agc474148680a232056191dd4830382 */
 
 	if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio)) {
 		bool out = true;
@@ -398,27 +425,31 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 {
 	int rc = 0;
 
-	if (gpio_is_valid(panel->reset_config.disp_en_gpio))
-		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
+	if (panel->disp_feature->zte_lcd_gesture == 1 && panel->zte_hfp_vfp_vid_switch) {
+		DSI_INFO("msm_lcd don't set reset to low when tp lcd gesture\n");
+	} else {
+		if (gpio_is_valid(panel->reset_config.disp_en_gpio))
+			gpio_set_value(panel->reset_config.disp_en_gpio, 0);
 
-	if (gpio_is_valid(panel->reset_config.reset_gpio) &&
-					!panel->reset_gpio_always_on)
-		gpio_set_value(panel->reset_config.reset_gpio, 0);
+		if (gpio_is_valid(panel->reset_config.reset_gpio) &&
+						!panel->reset_gpio_always_on)
+			gpio_set_value(panel->reset_config.reset_gpio, 0);
 
-	if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio))
-		gpio_set_value(panel->reset_config.lcd_mode_sel_gpio, 0);
+		if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio))
+			gpio_set_value(panel->reset_config.lcd_mode_sel_gpio, 0);
 
-	if (gpio_is_valid(panel->panel_test_gpio)) {
-		rc = gpio_direction_input(panel->panel_test_gpio);
-		if (rc)
-			DSI_WARN("set dir for panel test gpio failed rc=%d\n",
-				 rc);
-	}
+		if (gpio_is_valid(panel->panel_test_gpio)) {
+			rc = gpio_direction_input(panel->panel_test_gpio);
+			if (rc)
+				DSI_WARN("set dir for panel test gpio failed rc=%d\n",
+					rc);
+		}
 
-	rc = dsi_panel_set_pinctrl_state(panel, false);
-	if (rc) {
-		DSI_ERR("[%s] failed set pinctrl state, rc=%d\n", panel->name,
-		       rc);
+		rc = dsi_panel_set_pinctrl_state(panel, false);
+		if (rc) {
+			DSI_ERR("[%s] failed set pinctrl state, rc=%d\n", panel->name,
+				rc);
+		}
 	}
 
 	rc = dsi_pwr_enable_regulator(&panel->power_info, false);
@@ -652,42 +683,56 @@ error:
 	return rc;
 }
 
+/* Started by AICoder, pid:fa045v233bq7e9d1452c0b26b0f03a4496542ba6 */
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 {
-	int rc = 0;
-	struct dsi_backlight_config *bl = &panel->bl_config;
+    int rc = 0;
+    struct dsi_backlight_config *bl = &panel->bl_config;
+    static u32 last_bl = 0x0;
 
-	if (panel->host_config.ext_bridge_mode)
-		return 0;
+    if (panel->host_config.ext_bridge_mode)
+        return 0;
 
-	pr_info("[MSM_LCD] %s: bl_level = %d!\n", __func__, bl_lvl);
-    
-	zte_dsi_panel_convert_limit_bl(panel, &bl_lvl);
+    pr_info("[MSM_LCD] %s: bl_level = %d!\n", __func__, bl_lvl);
 
-	zte_dsi_panel_convert_hdr_bl(panel, &bl_lvl);
+    zte_dsi_panel_convert_limit_bl(panel, &bl_lvl);
 
-	switch (bl->type) {
-	case DSI_BACKLIGHT_WLED:
-		rc = backlight_device_set_brightness(bl->raw_bd, bl_lvl);
-		break;
-	case DSI_BACKLIGHT_DCS:
-		if (panel->disp_feature->hbm_config != NULL) 
-			rc = zte_dsi_panel_update_backlight(panel, bl_lvl);
-		else
-			rc = dsi_panel_update_backlight(panel, bl_lvl);
-		break;
-	case DSI_BACKLIGHT_EXTERNAL:
-		break;
-	case DSI_BACKLIGHT_PWM:
-		rc = dsi_panel_update_pwm_backlight(panel, bl_lvl);
-		break;
-	default:
-		DSI_ERR("Backlight type(%d) not supported\n", bl->type);
-		rc = -ENOTSUPP;
-	}
+    zte_dsi_panel_convert_hdr_bl(panel, &bl_lvl);
 
-	return rc;
+    switch (bl->type) {
+    case DSI_BACKLIGHT_WLED:
+        rc = backlight_device_set_brightness(bl->raw_bd, bl_lvl);
+        break;
+    case DSI_BACKLIGHT_DCS:
+        if (panel->disp_feature->hbm_config != NULL)
+            rc = zte_dsi_panel_update_backlight(panel, bl_lvl);
+        else if (panel->zte_hfp_vfp_vid_switch) {
+            #ifdef CONFIG_ZTE_LCD_USE_I2C
+            // clear the status register before setting the backlight
+            if (bl_lvl != 0 && last_bl == 0) {
+                lp8556_read(0x02);
+				AW37504_read(0x03);//add by zte for AW I2C test
+            }
+            #endif
+            rc = zte_dsi_panel_update_backlight_vid(panel, bl_lvl);
+            last_bl = bl_lvl;
+        }
+        else
+            rc = dsi_panel_update_backlight(panel, bl_lvl);
+        break;
+    case DSI_BACKLIGHT_EXTERNAL:
+        break;
+    case DSI_BACKLIGHT_PWM:
+        rc = dsi_panel_update_pwm_backlight(panel, bl_lvl);
+        break;
+    default:
+        DSI_ERR("Backlight type(%d) not supported\n", bl->type);
+        rc = -ENOTSUPP;
+    }
+
+    return rc;
 }
+/* Ended by AICoder, pid:fa045v233bq7e9d1452c0b26b0f03a4496542ba6 */
 
 static u32 dsi_panel_get_brightness(struct dsi_backlight_config *bl)
 {
@@ -1643,6 +1688,111 @@ static int dsi_panel_parse_dfps_caps(struct dsi_panel *panel)
 			dfps_caps->max_refresh_rate = dfps_caps->dfps_list[i];
 	}
 
+    /* add by zte for video fps begin */
+    panel->zte_hfp_vfp_vid_switch = utils->read_bool(utils->data, "zte,mdss-dsi-pan-hfp-vfp-switch");
+    pr_info("MSM_LCD zte_hfp_vfp_vid_switch = %d\n",  panel->zte_hfp_vfp_vid_switch);
+	if (dfps_caps->dfps_support && panel->zte_hfp_vfp_vid_switch) {
+		rc = dfps_caps->dec_vfp_list_len = utils->count_u32_elems(utils->data,
+					  "zte,mdss-dsi-dfps-dec-vfp-list");
+		dfps_caps->dec_vfp_list_len = rc > 0 ? rc : 0;
+		if (dfps_caps->dec_vfp_list_len) {
+			dfps_caps->dec_vfp_list = kcalloc(dfps_caps->dec_vfp_list_len, sizeof(u32),
+					GFP_KERNEL);
+			if (!dfps_caps->dec_vfp_list) {
+				DSI_ERR("[%s] kcalloc decrease vfp list failed\n", name);
+				rc = -ENOMEM;
+				goto error;
+			} else {
+				pr_info("msm_lcd vfp list len = %d\n", rc);
+			}
+
+			rc = utils->read_u32_array(utils->data,
+					"zte,mdss-dsi-dfps-dec-vfp-list",
+					dfps_caps->dec_vfp_list,
+					dfps_caps->dec_vfp_list_len);
+			if (rc) {
+				DSI_ERR("[%s] decrease vfp list parse failed\n", name);
+				rc = -EINVAL;
+				goto error;
+			}
+		}
+
+		rc = dfps_caps->dec_hfp_list_len = utils->count_u32_elems(utils->data,
+					  "zte,mdss-dsi-dfps-dec-hfp-list");
+		dfps_caps->dec_hfp_list_len = rc > 0 ? rc : 0;
+		if (dfps_caps->dec_hfp_list_len) {
+			dfps_caps->dec_hfp_list = kcalloc(dfps_caps->dec_hfp_list_len, sizeof(u32),
+					GFP_KERNEL);
+			if (!dfps_caps->dec_hfp_list) {
+				DSI_ERR("[%s] kcalloc decrease hfp list failed\n", name);
+				rc = -ENOMEM;
+				goto error;
+			} else {
+				pr_info("msm_lcd hfp list len = %d\n", rc);
+			}
+
+			rc = utils->read_u32_array(utils->data,
+					"zte,mdss-dsi-dfps-dec-hfp-list",
+					dfps_caps->dec_hfp_list,
+					dfps_caps->dec_hfp_list_len);
+			if (rc) {
+				DSI_ERR("[%s] decrease hfp list parse failed\n", name);
+				rc = -EINVAL;
+				goto error;
+			}
+		}
+
+		rc = dfps_caps->dec_hsa_list_len = utils->count_u32_elems(utils->data,
+					  "zte,mdss-dsi-dfps-dec-hsa-list");
+		dfps_caps->dec_hsa_list_len = rc > 0 ? rc : 0;
+		if (dfps_caps->dec_hsa_list_len) {
+			dfps_caps->dec_hsa_list = kcalloc(dfps_caps->dec_hsa_list_len, sizeof(u32),
+					GFP_KERNEL);
+			if (!dfps_caps->dec_hsa_list) {
+				DSI_ERR("[%s] kcalloc decrease hsa list failed\n", name);
+				rc = -ENOMEM;
+				goto error;
+			} else {
+				pr_info("msm_lcd hsa list len = %d\n", rc);
+			}
+
+			rc = utils->read_u32_array(utils->data,
+					"zte,mdss-dsi-dfps-dec-hsa-list",
+					dfps_caps->dec_hsa_list,
+					dfps_caps->dec_hsa_list_len);
+			if (rc) {
+				DSI_ERR("[%s] decrease hsa list parse failed\n", name);
+				rc = -EINVAL;
+				goto error;
+			}
+		}
+
+		rc = dfps_caps->dec_hbp_list_len = utils->count_u32_elems(utils->data,
+					  "zte,mdss-dsi-dfps-dec-hbp-list");
+		dfps_caps->dec_hbp_list_len = rc > 0 ? rc : 0;
+		if (dfps_caps->dec_hbp_list_len) {
+			dfps_caps->dec_hbp_list = kcalloc(dfps_caps->dec_hbp_list_len, sizeof(u32),
+					GFP_KERNEL);
+			if (!dfps_caps->dec_hbp_list) {
+				DSI_ERR("[%s] kcalloc decrease hbp list failed\n", name);
+				rc = -ENOMEM;
+				goto error;
+			} else {
+				pr_info("msm_lcd hbp list len = %d\n", rc);
+			}
+
+			rc = utils->read_u32_array(utils->data,
+					"zte,mdss-dsi-dfps-dec-hbp-list",
+					dfps_caps->dec_hbp_list,
+					dfps_caps->dec_hbp_list_len);
+			if (rc) {
+				DSI_ERR("[%s] decrease hbp list parse failed\n", name);
+				rc = -EINVAL;
+				goto error;
+			}
+		}
+	}
+	/* add by zte for video fps end */
 error:
 	return rc;
 }
@@ -1951,6 +2101,10 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"zte,mdss-dsi-spr-on-commands",
 	"zte,mdss-dsi-spr-off-commands",
 	/*add DSI CMDS by zte end*/
+	"qcom,mdss-dsi-switch60-commands",
+	"qcom,mdss-dsi-switch90-commands",
+	"qcom,mdss-dsi-switch120-commands",
+	"qcom,mdss-dsi-switch144-commands",
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -2009,6 +2163,10 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"zte,mdss-dsi-spr-on-commands-state",
 	"zte,mdss-dsi-spr-off-commands-state",
 	/*add DSI CMDS by zte end*/
+	"qcom,mdss-dsi-switch60-commands-state",
+	"qcom,mdss-dsi-switch90-commands-state",
+	"qcom,mdss-dsi-switch120-commands-state",
+	"qcom,mdss-dsi-switch144-commands-state",
 };
 
 int dsi_panel_get_cmd_pkt_count(const char *data, u32 length, u32 *cnt)
@@ -5125,3 +5283,43 @@ error:
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
+
+int zte_dsi_panel_set_fps(struct dsi_panel *panel,int fps)
+{
+	int rc = 0;
+
+	if (!panel) {
+		DSI_ERR("invalid params\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&panel->panel_lock);
+	if (!panel->panel_initialized)
+		goto exit;
+
+	if (fps == 60) {
+		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_60_FPS);
+		if (rc)
+			DSI_ERR("[%s] failed to send DSI_CMD_SET_60_FPS cmd, rc=%d\n",
+		       panel->name, rc);
+	} else if (fps == 90) {
+		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_90_FPS);
+		if (rc)
+			DSI_ERR("[%s] failed to send DSI_CMD_SET_90_FPS cmd, rc=%d\n",
+		       panel->name, rc);
+	} else if (fps == 144) {
+		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_144_FPS);
+		if (rc)
+			DSI_ERR("[%s] failed to send DSI_CMD_SET_144_FPS cmd, rc=%d\n",
+		       panel->name, rc);
+	} else {
+		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_120_FPS);
+		if (rc)
+			DSI_ERR("[%s] failed to send DSI_CMD_SET_120_FPS cmd, rc=%d\n",
+		       panel->name, rc);
+	}
+exit:
+	mutex_unlock(&panel->panel_lock);
+	return rc;
+}
+/*add by zte for dcs backlight function end*/

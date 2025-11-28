@@ -174,6 +174,7 @@ static int aw882xx_i2c_reads(struct aw882xx *aw882xx,
 		aw_dev_err(aw882xx->dev, "transfer failed.");
 #ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
 		zlog_client_record(aw882xx->zlog_aw882xx_client, "aw882xx i2c transfer failed ret=%d", ret);
+                zlog_client_record(aw882xx->zlog_aw882xx_client, "aw882xx i2c transfer failed reg_addr 0x%02x, data_len %d, data_buf %s", reg_addr, data_len, *data_buf);
 		zlog_client_notify(aw882xx->zlog_aw882xx_client, ZLOG_SMARTPA_I2C_R_ERROR_NO);
 #endif
 		return ret;
@@ -181,6 +182,7 @@ static int aw882xx_i2c_reads(struct aw882xx *aw882xx,
 		aw_dev_err(aw882xx->dev, "transfer failed(size error).");
 		return -ENXIO;
 	}
+        //aw_dev_info(aw882xx->dev, "i2c_transfer returned %d", ret);
 
 	return 0;
 }
@@ -2061,7 +2063,6 @@ static ssize_t aw882xx_awrw_show(struct device *dev,
 	struct aw882xx_i2c_packet *packet = &aw882xx->i2c_packet;
 	int data_len, len = 0;
 	char *reg_data = NULL;
-
 	if (packet->status != AWRW_I2C_ST_READ) {
 		aw_dev_err(aw882xx->dev, "please write read cmd first");
 		return -EINVAL;

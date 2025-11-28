@@ -40317,8 +40317,66 @@ typedef enum {
      */
     WMI_ROAM_PARAM_ROAM_RSSI_BOOST_FOR_6GHZ_CAND_AP = 8,
 
+    /*
+     * Roam param to indicate unsupported Power Type for 6 GHz Candidate AP
+     * found during Roam Scan. If AP operates on the power type disabled by
+     * the host, then that candidate should not be selected.
+     * This unsupported Power Type will be configured based
+     * on disabled 6GHz Power Types in Regdomain
+     *
+     * If below bits in the obtianed Bitmap is set then any AP
+     * broadcasting these Power Types should not be selected
+     * BIT 0   - Indoor Access Point
+     * BIT 1   - Standard Power (SP) Access Point
+     * BIT 2   - Very Low Power (VLP) Access Point
+     * BIT 3-7 - Reserved
+     */
+    WMI_ROAM_PARAM_ROAM_UNSUPPORTED_6GHZ_POWERTYPE = 9,
+
+    /*
+     * crypto params to allow EHT/MLO in WPA2/WPA3 security.
+     * BITMAP of wlan_crypto_roam_eht_config
+     */
+    WMI_ROAM_PARAM_CRYPTO_EHT_CONFIG = 10,
+
+
     /*=== END ROAM_PARAM_PROTOTYPE SECTION ===*/
 } WMI_ROAM_PARAM;
+
+typedef enum {
+    /*
+     * BIT 0 - WLAN_CRYPTO_WPA2_ALLOW_NON_MLO_EHT:
+     *         Connect to non-MLO/MLO WPA2 EHT APs in EHT without PMF support.
+     *
+     * BIT 1 - WLAN_CRYPTO_WPA2_ALLOW_MLO:
+     *         Connect to MLO WPA2 EHT APs in MLO without PMF support.
+     *
+     * BIT 2 - WLAN_CRYPTO_WPA2_ALLOW_NON_MLO_EHT_MFPC_SET:
+     *         Connect to non-MLO/MLO WPA2 EHT APs in EHT.
+     *         (PMF capable is mandatory).
+     *
+     * BIT 3 - WLAN_CRYPTO_WPA2_ALLOW_MLO_MFPC_SET:
+     *         Connect to MLO WPA2 EHT APs in MLO
+     *         (PMF capable is mandatory).
+     *
+     * BIT 4 - 15 - reserved for future WPA2 security configs
+     *
+     * BIT 16 - WLAN_CRYPTO_WPA3_SAE_ALLOW_NON_MLO_EHT_HNP:
+     *          Connect to non-MLO/MLO WPA3-SAE without support for H2E
+     *          (or no RSNXE IE in beacon) in non-MLO EHT.
+     *
+     * BIT 17 - WLAN_CRYPTO_WPA3_SAE_ALLOW_MLO_HNP:
+     *          Connect to MLO WPA3-SAE without support for H2E
+     *          (or no RSNXE IE in beacon).
+     */
+    WLAN_CRYPTO_WPA2_ALLOW_NON_MLO_EHT          = 0x00000001,
+    WLAN_CRYPTO_WPA2_ALLOW_MLO                  = 0x00000002,
+    WLAN_CRYPTO_WPA2_ALLOW_NON_MLO_EHT_MFPC_SET = 0x00000004,
+    WLAN_CRYPTO_WPA2_ALLOW_MLO_MFPC_SET         = 0x00000008,
+
+    WLAN_CRYPTO_WPA3_SAE_ALLOW_NON_MLO_EHT_HNP  = 0x00010000,
+    WLAN_CRYPTO_WPA3_SAE_ALLOW_MLO_HNP          = 0x00020000,
+} wlan_crypto_roam_eht_config;
 
 typedef struct {
     A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_vdev_get_big_data_cmd_fixed_param */

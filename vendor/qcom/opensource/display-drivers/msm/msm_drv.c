@@ -2348,6 +2348,11 @@ static struct platform_driver msm_platform_driver = {
 	},
 };
 
+#ifdef CONFIG_ZTE_LCD_USE_I2C
+extern int disp_i2c_driver_init(void);
+extern void disp_i2c_driver_exit(void);
+#endif
+
 static int __init msm_drm_register(void)
 {
 	if (!modeset)
@@ -2369,6 +2374,9 @@ static int __init msm_drm_register(void)
 	nubia_usb_switch_dp_init();
 	nubia_dp_preference_init();
 #endif
+#ifdef CONFIG_ZTE_LCD_USE_I2C
+	disp_i2c_driver_init();
+#endif
 	return 0;
 }
 
@@ -2389,6 +2397,9 @@ static void __exit msm_drm_unregister(void)
 #if IS_ENABLED(CONFIG_NUBIA_DP)
 	nubia_usb_switch_dp_exit();
 	nubia_dp_preference_exit();
+#endif
+#ifdef CONFIG_ZTE_LCD_USE_I2C
+    disp_i2c_driver_exit();
 #endif
 	platform_driver_unregister(&msm_platform_driver);
 }

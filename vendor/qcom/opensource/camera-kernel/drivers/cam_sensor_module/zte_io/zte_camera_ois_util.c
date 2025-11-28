@@ -183,6 +183,8 @@ static int ois_debugfs_cal_g(void *data, u64 *val)
 		ois_dw9784_tiro_debugfs_cal_g(data, val);
 	} else if (strncmp(ptr->s_ctrl->ois_name, "ois_dw9784_cerro_imx800", strlen("ois_dw9784_cerro_imx800")) == 0) {
 		ois_dw9784_debugfs_cal_g(data, val);
+	} else if (strncmp(ptr->s_ctrl->ois_name, "ois_dw9784_cerro_imx906", strlen("ois_dw9784_cerro_imx906")) == 0) {
+		ois_dw9784_debugfs_cal_g(data, val);
 	} else {
 		pr_err("%s:%d: %s can't find match cal function", __func__, __LINE__, ptr->s_ctrl->ois_name);
 	}
@@ -235,6 +237,10 @@ int msm_ois_enable_debugfs(struct cam_ois_ctrl_t *s_ctrl)
 	if (!debug_ptr) {
 		pr_err("failed: no memory s_ctrl %p", debug_ptr);
 		return -ENOMEM;
+	}
+
+	if (strncmp(s_ctrl->ois_name, "ois_dw9784_cerro_imx906", strlen("ois_dw9784_cerro_imx906")) == 0) {
+		strncpy(s_ctrl->ois_name, "ois_dw9784_cerro_imx800", sizeof(s_ctrl->ois_name));
 	}
 
 	memset(buf, 0, sizeof(buf));

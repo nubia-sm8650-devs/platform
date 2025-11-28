@@ -1141,6 +1141,53 @@ struct csiphy_reg_t datarate_220_2p0Gsps_z60u_tele[] = {
 	{0x0A14, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
 };
 
+struct csiphy_reg_t datarate_220_2p0Gsps_gn5_wifi[] = {
+	/* AFE Settings */
+	{0x0268, 0xF1, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0294, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0278, 0x10, 0x00, CSIPHY_CDR_LN_SETTINGS},
+	{0x0288, 0x20, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x026C, 0x3d, 0x00, CSIPHY_SHORT_CHANNEL_PARAMS},
+	{0x026C, 0x3d, 0x00, CSIPHY_STANDARD_CHANNEL_PARAMS},
+	{0x028C, 0x08, 0x00, CSIPHY_SHORT_CHANNEL_PARAMS},
+	{0x028C, 0x08, 0x00, CSIPHY_STANDARD_CHANNEL_PARAMS},
+	{0x0270, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0274, 0x03, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0668, 0xF1, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0694, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0678, 0x10, 0x00, CSIPHY_CDR_LN_SETTINGS},
+	{0x0688, 0x20, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x066C, 0x3d, 0x00, CSIPHY_SHORT_CHANNEL_PARAMS},
+	{0x066C, 0x3d, 0x00, CSIPHY_STANDARD_CHANNEL_PARAMS},
+	{0x068C, 0x08, 0x00, CSIPHY_SHORT_CHANNEL_PARAMS},
+	{0x068C, 0x08, 0x00, CSIPHY_STANDARD_CHANNEL_PARAMS},
+	{0x0670, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0674, 0x03, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A68, 0xF1, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A94, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A78, 0x10, 0x00, CSIPHY_CDR_LN_SETTINGS},
+	{0x0A88, 0x20, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A6C, 0x3d, 0x00, CSIPHY_SHORT_CHANNEL_PARAMS},
+	{0x0A6C, 0x3d, 0x00, CSIPHY_STANDARD_CHANNEL_PARAMS},
+	{0x0A8C, 0x08, 0x00, CSIPHY_SHORT_CHANNEL_PARAMS},
+	{0x0A8C, 0x08, 0x00, CSIPHY_STANDARD_CHANNEL_PARAMS},
+	{0x0A70, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A74, 0x03, 0x0A, CSIPHY_DEFAULT_PARAMS},
+	/* Datarate Sensitive */
+	{0x020C, 0x27, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+	{0x0208, 0x00, 0x00, CSIPHY_SETTLE_CNT_HIGHER_BYTE},
+	{0x0210, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0214, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x060C, 0x27, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+	{0x0608, 0x00, 0x00, CSIPHY_SETTLE_CNT_HIGHER_BYTE},
+	{0x0610, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0614, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A0C, 0x27, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+	{0x0A08, 0x00, 0x00, CSIPHY_SETTLE_CNT_HIGHER_BYTE},
+	{0x0A10, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+	{0x0A14, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+};
+
 struct csiphy_reg_t datarate_220_2p1Gsps[] = {
 	/* AFE Settings */
 	{0x0268, 0xF1, 0x00, CSIPHY_DEFAULT_PARAMS},
@@ -2160,6 +2207,21 @@ static struct data_rate_reg_info_t data_rate_settings_2_2_0_z60u_tele[] = {
 	},
 };
 
+static struct data_rate_reg_info_t data_rate_settings_2_2_0_gn5_wifi[] = {
+	{
+		/* ((2.0 GSpS) * (10^9) * (2.28 bits/symbol)) rounded value */
+		.bandwidth = 4560000000,
+		.data_rate_reg_array_size = ARRAY_SIZE(datarate_220_2p0Gsps_gn5_wifi),
+		.data_rate_reg_array[0][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[1][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[2][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[3][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[4][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[5][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[6][0] = datarate_220_2p0Gsps_gn5_wifi,
+		.data_rate_reg_array[7][0] = datarate_220_2p0Gsps_gn5_wifi,
+	},
+};
 
 struct csiphy_reg_t bist_3ph_arr_2_2_0[] = {
 	{0x0230, 0x1C, 0x00, CSIPHY_DEFAULT_PARAMS},
@@ -2248,6 +2310,11 @@ struct data_rate_settings_t data_rate_delta_table_2_2_0_z60u_tele = {
 	.num_data_rate_settings = ARRAY_SIZE(data_rate_settings_2_2_0_z60u_tele),
 	.data_rate_settings = data_rate_settings_2_2_0_z60u_tele,
 };
+
+struct data_rate_settings_t data_rate_delta_table_2_2_0_gn5_wifi = {
+	.num_data_rate_settings = ARRAY_SIZE(data_rate_settings_2_2_0_gn5_wifi),
+	.data_rate_settings = data_rate_settings_2_2_0_gn5_wifi,
+};
 /* zte add end */
 
 struct csiphy_reg_parms_t csiphy_v2_2_0 = {
@@ -2303,4 +2370,20 @@ struct csiphy_ctrl_t ctrl_reg_2_2_0_z60u_tele = {
 	.getclockvoting = get_clk_voting_dynamic,
 };
 
+struct csiphy_ctrl_t ctrl_reg_2_2_0_gn5_wifi = {
+	.csiphy_common_reg = csiphy_common_reg_2_2_0,
+	.csiphy_2ph_reg = csiphy_2ph_v2_2_0_reg,
+	.csiphy_3ph_reg = csiphy_3ph_v2_2_0_reg,
+	.csiphy_2ph_combo_mode_reg = csiphy_2ph_v2_2_0_combo_mode_reg,
+	.csiphy_3ph_combo_reg = NULL,
+	.csiphy_2ph_3ph_mode_reg = NULL,
+	.csiphy_reg = &csiphy_v2_2_0,
+	.csiphy_irq_reg = csiphy_irq_reg_2_2_0,
+	.csiphy_reset_enter_regs = csiphy_reset_enter_reg_2_2_0,
+	.csiphy_reset_exit_regs = csiphy_reset_exit_reg_2_2_0,
+	.csiphy_lane_config_reg = csiphy_lane_en_reg_2_2_0,
+	.data_rates_settings_table = &data_rate_delta_table_2_2_0_gn5_wifi,
+	.csiphy_bist_reg = &bist_setting_2_2_0,
+	.getclockvoting = get_clk_voting_dynamic,
+};
 #endif /* _CAM_CSIPHY_2_2_0_HWREG_H_ */

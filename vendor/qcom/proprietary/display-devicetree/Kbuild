@@ -53,6 +53,14 @@ ifneq (,$(filter cerro,$(ZTE_BOARD_NAME)))
 dtbo-$(CONFIG_ARCH_PINEAPPLE) += display/zte-lcd-supply-cerro.dtbo
 endif
 
+ifneq (,$(filter panax,$(ZTE_BOARD_NAME)))
+dtbo-$(CONFIG_ARCH_PINEAPPLE) += display/zte-lcd-supply-panax.dtbo
+endif
+
+ifneq (,$(filter qvanise,$(ZTE_BOARD_NAME)))
+dtbo-$(CONFIG_ARCH_PINEAPPLE) += display/zte-lcd-supply-qvanise.dtbo
+endif
+
 always-y    := $(dtb-y) $(dtbo-y)
 subdir-y    := $(dts-dirs)
 clean-files    := *.dtb *.dtbo

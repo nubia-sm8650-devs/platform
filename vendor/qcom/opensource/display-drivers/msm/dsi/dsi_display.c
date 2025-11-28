@@ -1480,7 +1480,11 @@ int dsi_display_set_power(struct drm_connector *connector,
 		if ((display->panel->power_mode == SDE_MODE_DPMS_LP1) ||
 			(display->panel->power_mode == SDE_MODE_DPMS_LP2)) {
 			if (atomic_read(&display->panel->pm_aod)) {
-				rc = dsi_panel_set_nolp(display->panel);
+				if (display->panel->disp_feature->zte_lcd_hbm || display->panel->is_hbm_enabled){
+					pr_info("MSM_LCD skip nolp when in hbm mode!\n");
+				} else {
+					rc = dsi_panel_set_nolp(display->panel);
+				}
 				atomic_dec(&display->panel->pm_aod);
 			}else {
 				pr_info("MSM_LCD skip nolp!\n");
@@ -1493,6 +1497,10 @@ int dsi_display_set_power(struct drm_connector *connector,
 		break;
 	case SDE_MODE_DPMS_OFF:
 		display->panel->disp_feature->zte_panel_state = SDE_MODE_DPMS_OFF;
+		if (display->panel->enter_dim_worked) {
+			cancel_delayed_work(&display->panel->dim_work);
+			display->panel->enter_dim_worked = false;
+		}
 		display->panel->in_aod = false;
 		if (atomic_read(&display->panel->pm_aod))
 			atomic_dec(&display->panel->pm_aod);
@@ -5066,6 +5074,7 @@ static int dsi_display_dfps_calc_front_porch(
 {
 	s32 b_fp_new;
 	int add_porches, diff;
+	struct dsi_display *display = get_main_display();
 
 	if (!b_fp_out) {
 		DSI_ERR("Invalid params\n");
@@ -5094,11 +5103,20 @@ static int dsi_display_dfps_calc_front_porch(
 	DSI_DEBUG("fps %u a %u b %u b_fp %u new_fp %d\n",
 			new_fps, a_total, b_total, b_fp, b_fp_new);
 
-	if (b_fp_new < 0) {
-		DSI_ERR("Invalid new_hfp calcluated%d\n", b_fp_new);
-		return -EINVAL;
-	}
+/* Started by AICoder, pid:f2ece8de95c9ed2149ee0b0cd072f91e18757869 */
+    // Check if the new_hfp calculated is valid
+      if (b_fp_new < 0) {
+        DSI_ERR("Invalid new_hfp calculated: %d\n", b_fp_new);
+        return -EINVAL;
+      }
 
+      // Adjust the new_hfp value for 144Hz FPS and VID switching
+      if (new_fps == 144 && display->panel->zte_hfp_vfp_vid_switch) {
+        b_fp_new = b_fp_new - 1; // Subtract 1 from the new_hfp value
+        DSI_INFO("msm_lcd fps %u, a %u, b %u, b_fp %u, new_fp %d\n",
+                 new_fps, a_total, b_total, b_fp, b_fp_new);
+      }
+/* Ended by AICoder, pid:f2ece8de95c9ed2149ee0b0cd072f91e18757869 */
 	/**
 	 * TODO: To differentiate from clock method when communicating to the
 	 * other components, perhaps we should set clk here to original value
@@ -5127,7 +5145,6 @@ static int dsi_display_get_dfps_timing(struct dsi_display *display,
 	struct dsi_display_mode per_ctrl_mode;
 	struct dsi_mode_info *timing;
 	struct dsi_ctrl *m_ctrl;
-
 	int rc = 0;
 
 	if (!display || !adj_mode) {
@@ -5161,7 +5178,13 @@ static int dsi_display_get_dfps_timing(struct dsi_display *display,
 	}
 	/* TODO: Remove this direct reference to the dsi_ctrl */
 	timing = &per_ctrl_mode.timing;
-
+	if (display->panel->zte_hfp_vfp_vid_switch) {
+		if (timing->refresh_rate == 90 || timing->refresh_rate == 144) {
+			dfps_caps.type= DSI_DFPS_IMMEDIATE_HFP;
+		} else {
+			dfps_caps.type = DSI_DFPS_IMMEDIATE_VFP;
+		}
+	}
 	switch (dfps_caps.type) {
 	case DSI_DFPS_IMMEDIATE_VFP:
 		rc = dsi_display_dfps_calc_front_porch(
@@ -5194,6 +5217,13 @@ static int dsi_display_get_dfps_timing(struct dsi_display *display,
 	default:
 		DSI_ERR("Unsupported DFPS mode %d\n", dfps_caps.type);
 		rc = -ENOTSUPP;
+	}
+
+	if (display->panel->zte_hfp_vfp_vid_switch) {
+		DSI_INFO("MSM_LCD cur_rate=%d,type=%d,refresh_rate=%d,vfp=%d,%d,%d hfp=%d,%d,%d adj_vfp=%d,%d,%d adj_hfp=%d,%d,%d\n", curr_refresh_rate, dfps_caps.type,
+			timing->refresh_rate, timing->v_front_porch, timing->v_back_porch, timing->v_sync_width, timing->h_front_porch, timing->h_back_porch,timing->h_sync_width,
+			adj_mode->timing.v_front_porch, adj_mode->timing.v_back_porch, adj_mode->timing.v_sync_width,
+			adj_mode->timing.h_front_porch, adj_mode->timing.h_back_porch, adj_mode->timing.h_sync_width);
 	}
 
 	return rc;
@@ -7409,7 +7439,24 @@ int dsi_display_get_modes_helper(struct dsi_display *display,
 			/* Set first timing sub mode as preferred mode */
 			display->modes[start].is_preferred = true;
 		}
-
+		/* Started by AICoder, pid:be7a429f17u78e7146f80a0600979c1922b6064b */
+		/*if (support_video_mode && display->panel->zte_hfp_vfp_vid_switch) {
+			for (i = 0; i < array_idx; i++) {
+				struct dsi_display_mode *mode = &display->modes[i];
+				if (mode->timing.refresh_rate == 120) {
+					mode->timing.clk_rate_hz = 1009430000;
+				} else if (mode->timing.refresh_rate == 144) {
+					mode->timing.clk_rate_hz = 1011228000;
+				} else if (mode->timing.refresh_rate == 90) {
+					mode->timing.clk_rate_hz = 1008870000;
+				} else if (mode->timing.refresh_rate == 60) {
+					mode->timing.clk_rate_hz = 1009430000;
+				} else {
+					mode->timing.clk_rate_hz = 1009430000;
+				}
+			}
+		}*/
+		/* Ended by AICoder, pid:be7a429f17u78e7146f80a0600979c1922b6064b */
 		bit_clk_list = &display_mode.priv_info->bit_clk_list;
 		if (support_video_mode && dfps_caps.dfps_support) {
 			if (dyn_clk_caps->dyn_clk_support) {
@@ -8026,7 +8073,10 @@ int dsi_display_set_mode(struct dsi_display *display,
 	if (display->panel->disp_feature != NULL) {
 		display->panel->disp_feature->zte_lcd_cur_fps = timing.refresh_rate;
 		if (display->panel->panel_mode == DSI_OP_VIDEO_MODE) {
-			DSI_INFO("msm_lcd DSI_OP_VIDEO_MODE fps send uevent\n");
+			//if (display->panel->zte_hfp_vfp_vid_switch) {
+				//zte_dsi_panel_set_fps(display->panel,timing.refresh_rate); //add by zte
+			//}
+			//DSI_INFO("msm_lcd DSI_OP_VIDEO_MODE fps send uevent\n");
 			zte_panel_fps_send_uevent(timing.refresh_rate);
 		}
 	}
@@ -8035,6 +8085,7 @@ int dsi_display_set_mode(struct dsi_display *display,
 			adj_mode.priv_info->mdp_transfer_time_us,
 			timing.h_active, timing.v_active, timing.refresh_rate,
 			adj_mode.priv_info->clk_rate_hz);
+
 	SDE_EVT32(adj_mode.priv_info->mdp_transfer_time_us,
 			timing.h_active, timing.v_active, timing.refresh_rate,
 			adj_mode.priv_info->clk_rate_hz);
@@ -9297,6 +9348,52 @@ struct dsi_display *get_main_display(void) {
 
 struct dsi_display *get_sec_display(void) {
 	return secondary_display;
+}
+// #endif
+
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+int dsi_panel_match_fps_pen_setting(struct dsi_panel *panel,
+				struct dsi_display_mode *adj_mode)
+{
+	int rc =0;
+	int retval = 0;
+	struct dsi_display_mode_priv_info *priv_info;
+
+	if (!panel || !panel->cur_mode || !panel->cur_mode->priv_info || !adj_mode) {
+		pr_err("msm_lcd fps invalid params\n");
+		return -EAGAIN;
+	}
+
+	priv_info = panel->cur_mode->priv_info;
+
+	if (!priv_info->cmd_sets[DSI_CMD_SET_120_FPS].count) {
+		pr_info("msm_lcd fps DSI_CMD_SET_DISP_PEN_120HZ not defined, return\n");
+		return 0;
+	}
+
+	/* match fps(120/60/30Hz) pen seeting cmd */
+	if (adj_mode->timing.refresh_rate == 120)
+		rc = zte_dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_120_FPS);
+	else if (adj_mode->timing.refresh_rate == 60)
+		rc = zte_dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_60_FPS);
+	else if (adj_mode->timing.refresh_rate == 144)
+		rc = zte_dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_144_FPS);
+	else if (adj_mode->timing.refresh_rate == 90)
+		rc = zte_dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_90_FPS);
+	else {
+		pr_info("msm_lcd fps=%d not defined, return\n", adj_mode->timing.refresh_rate);
+		return 0;
+	}
+
+	if (rc) {
+		pr_err("msm_lcd Failed to send DSI_CMD_SET_DISP_PEN_120HZ command\n");
+		retval = -EAGAIN;
+		goto error;
+	} else
+		pr_debug("%s: msm_lcd refresh_rate[%d]\n", __func__, adj_mode->timing.refresh_rate);
+
+error:
+	return retval;
 }
 // #endif
 

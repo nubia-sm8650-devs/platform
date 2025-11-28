@@ -42,6 +42,7 @@ enum {
 	ZTE_LCD_BL_LIMIT,
 	ZTE_LCD_SECOND_IRQ_FPS,
 	ZTE_LCD_SPR_CTRL,
+	ZTE_LCD_GESTURE,
 	ZTE_LCD_MAX_CTRL
 };
 
@@ -62,6 +63,7 @@ static const char *feature_name[ZTE_LCD_MAX_CTRL] = {
 	"lcd_bl_limit",
 	"lcd_second_irq_fps",
 	"lcd_spr",
+	"driver/lcd_gesture",
 };
 
 enum hdr_type {

@@ -3,8 +3,13 @@ dtbo-y += kalama-bt.dtbo
 endif
 
 ifeq ($(CONFIG_ARCH_PINEAPPLE),y)
-dtbo-y += pineapple-kiwi-bt.dtbo
-dtbo-y += pineapple-hdk-kiwi-bt.dtbo
+  ifneq (,$(filter qvanise panax,$(ZTE_BOARD_NAME)))
+    $(warning "enter into pineapple hdk bt PQ83P01/P02 dtsi")
+    dtbo-y += pineapple-hdk-kiwi-bt-zte.dtbo
+  else
+    dtbo-y += pineapple-kiwi-bt.dtbo
+    dtbo-y += pineapple-hdk-kiwi-bt.dtbo
+  endif
 endif
 
 ifeq ($(CONFIG_ARCH_WAIPIO),y)

@@ -175,6 +175,27 @@ static struct bt_power_vreg_data bt_vregs_info_kiwi[] = {
 		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
 };
 
+// Regulator structure for kiwi BT SoC series
+static struct bt_power_vreg_data bt_vregs_info_kiwi_ant[] = {
+	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
+		{BT_VDD_LDO, BT_VDD_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd12-io",      1200000, 1200000, 0, false, true,
+		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-aon",     950000,  950000,  0, false, true,
+		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  950000,  0, false, true,
+		{BT_VDD_RFACMN, BT_VDD_RFACMN_CURRENT}},
+	/* BT_CX_MX */
+	{NULL, "qcom,bt-vdd-dig",      950000,  950000,  0, false, true,
+		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  952000,  0, false, true,
+		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa1",     1350000, 1350000, 0, false, true,
+		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa2",     1900000, 1900000, 0, false, true,
+		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+};
+
 // Regulator structure for WCN399x BT SoC series
 static struct bt_power bt_vreg_info_wcn399x = {
 	.compatible = "qcom,wcn3990",
@@ -223,6 +244,12 @@ static struct bt_power bt_vreg_info_kiwi_no_share_ant_power = {
 	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
 };
 
+static struct bt_power bt_vreg_info_kiwi_ant = {
+	.compatible = "qcom,kiwiant",
+	.vregs = bt_vregs_info_kiwi_ant,
+	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi_ant),
+};
+
 static struct bt_power bt_vreg_info_converged = {
 	.compatible = "qcom,bt-qca-converged",
 	.vregs = bt_vregs_info_kiwi,
@@ -241,6 +268,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,qca6390", .data = &bt_vreg_info_qca6390},
 	{	.compatible = "qcom,qca6490", .data = &bt_vreg_info_qca6490},
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
+	{	.compatible = "qcom,kiwiant", .data = &bt_vreg_info_kiwi_ant},
 	{	.compatible = "qcom,kiwi-no-share-ant-power",
 			.data = &bt_vreg_info_kiwi_no_share_ant_power},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
@@ -1191,7 +1219,7 @@ static int bt_power_probe(struct platform_device *pdev)
 	int ret = 0;
 	int itr;
 
-	pr_debug("%s\n", __func__);
+	pr_info("Enter into %s\n", __func__);
 
 	/* Fill whole array with -2 i.e NOT_AVAILABLE state by default
 	 * for any GPIO or Reg handle.

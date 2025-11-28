@@ -811,4 +811,7 @@ static inline int sde_encoder_register_misr_event(struct drm_encoder *drm_enc, b
 
 	return 0;
 }
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+int sde_encoder_vid_wait_for_active(struct drm_encoder *drm_enc);
+// #endif
 #endif /* __SDE_ENCODER_H__ */

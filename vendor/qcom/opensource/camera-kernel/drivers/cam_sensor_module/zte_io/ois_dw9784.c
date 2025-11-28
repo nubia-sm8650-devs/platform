@@ -113,16 +113,9 @@ int calibration_save_ois_dw9784(void *data)
 {
 	pr_info("%s:%d: [dw9784_calibration_save_ois_dw9784] calibration save starting", __func__, __LINE__);
 	RamWrite16A_ois_dw9784(data, 0x7012, 0x000A);  // Set store mode
-
-	//When store is done, status changes to 0x6001
-	if (dw9784_wait_check_register(data, 0x7010, 0x6001) == FUNC_PASS) {
-		pr_info("[dw9784_set_cal_store] successful entry into store mode");
-	}
-	else {
-		pr_err("[dw9784_set_cal_store] failed to enter store mode");
-		return FUNC_FAIL;
-	}
-
+	mdelay(1);
+	RamWrite16A_ois_dw9784(data, 0x7010, 0xA000);  // Set store mode standby
+	mdelay(1);
 	dw9784_code_pt_off(data); /* code protection off */
 	RamWrite16A_ois_dw9784(data, 0x700F, 0x5959);  // Set protect code
 	mdelay(1);
@@ -130,7 +123,7 @@ int calibration_save_ois_dw9784(void *data)
 	mdelay(40);
 
 	//  When store is done, status changes to 0xA001
-	if (dw9784_wait_check_register(data, 0x7010, 0x6001) == FUNC_PASS) {
+	if (dw9784_wait_check_register(data, 0x7010, 0xA001) == FUNC_PASS) {
 		ois_reset_ois_dw9784(data);
 		pr_info("%s:%d: [dw9784_set_cal_store] finish", __func__, __LINE__);
 	}

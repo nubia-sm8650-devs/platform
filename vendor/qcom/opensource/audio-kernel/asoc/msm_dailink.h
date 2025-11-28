@@ -300,12 +300,26 @@ SND_SOC_DAILINK_DEFS(sep_mi2s_tx,
 
 SND_SOC_DAILINK_DEFS(pri_tdm_rx_0,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+#ifdef CONFIG_SND_SMARTPA_AW882XX
+	DAILINK_COMP_ARRAY(COMP_CODEC("aw882xx_smartpa.0-0034", "aw882xx-aif-0-34"),
+		COMP_CODEC("aw882xx_smartpa.0-0035", "aw882xx-aif-0-35"),
+		COMP_CODEC("aw882xx_smartpa.0-0036", "aw882xx-aif-0-36"),
+		COMP_CODEC("aw882xx_smartpa.0-0037", "aw882xx-aif-0-37")),
+#else
 	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-rx")),
+#endif
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(pri_tdm_tx_0,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+#ifdef CONFIG_SND_SMARTPA_AW882XX
+	DAILINK_COMP_ARRAY(COMP_CODEC("aw882xx_smartpa.0-0034", "aw882xx-aif-0-34"),
+		COMP_CODEC("aw882xx_smartpa.0-0035", "aw882xx-aif-0-35"),
+		COMP_CODEC("aw882xx_smartpa.0-0036", "aw882xx-aif-0-36"),
+		COMP_CODEC("aw882xx_smartpa.0-0037", "aw882xx-aif-0-37")),
+#else
 	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-tx")),
+#endif
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(sec_tdm_rx_0,

@@ -10,7 +10,10 @@
 #include "dsi_pwr.h"
 #include "dsi_parser.h"
 #include "dsi_defs.h"
+#include "dsi_panel.h"
+#include "dsi_display.h"
 
+extern struct dsi_display *get_main_display(void);
 /*
  * dsi_pwr_parse_supply_node() - parse power supply node from root device node
  */
@@ -128,6 +131,7 @@ static int dsi_pwr_enable_vregs(struct dsi_regulator_info *regs, bool enable)
 	int num_of_v = 0;
 	u32 pre_on_ms, post_on_ms;
 	u32 pre_off_ms, post_off_ms;
+	struct dsi_display *display = get_main_display();
 
 	if (enable) {
 		for (i = 0; i < regs->count; i++) {
@@ -175,6 +179,14 @@ static int dsi_pwr_enable_vregs(struct dsi_regulator_info *regs, bool enable)
 			pre_off_ms = vreg->pre_off_sleep;
 			post_off_ms = vreg->post_off_sleep;
 
+			if (display->panel != NULL) {
+				if (display->panel->disp_feature->zte_lcd_gesture == 1 && display->panel->zte_hfp_vfp_vid_switch) {
+					if (!strcmp(vreg->vreg_name, "vsn") || !strcmp(vreg->vreg_name, "vsp") || !strcmp(vreg->vreg_name, "vdddpanax")) {
+						DSI_INFO("msm_lcd skip regulator off:%s\n", vreg->vreg_name);
+						continue;
+					}
+				}
+			}
 			if (pre_off_ms)
 				usleep_range((pre_off_ms * 1000),
 						(pre_off_ms * 1000) + 10);

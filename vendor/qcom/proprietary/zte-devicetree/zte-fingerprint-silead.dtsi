@@ -1,0 +1,12 @@
+&soc {
+	silead_fp {
+		status = "ok";
+		compatible = "sil,silead_fp";
+		qcom,qup-id = <3>;
+		reg = <0>;
+		avdd-gpios = <&tlmm 93 0x1>;
+		irq-gpios = <&tlmm 92 0x2008>;
+		rst-gpios = <&tlmm 89 0x1>;
+		panel = <&dsi_bf068_hx8394d_10p99_dsc_144hz_video_dphy>;
+	};
+};

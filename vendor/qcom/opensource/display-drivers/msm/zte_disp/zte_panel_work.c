@@ -83,11 +83,15 @@ void dimming_enable_work_handler(struct work_struct *work) {
 		return;
 	}
 
-    pr_info("[MSM_LCD] handle dim\n");
+	if (panel->disp_feature->zte_lcd_hbm || panel->is_hbm_enabled) {
+		pr_info("[MSM_LCD] skip dim setting when hbm on\n");
+		return;
+	}
 
-    zte_set_disp_parameter(panel, ZTE_DIM_ON, 1, false);
-
-    return;
+	pr_info("[MSM_LCD] handle dim\n");
+	zte_set_disp_parameter(panel, ZTE_DIM_ON, 1, false);
+	panel->enter_dim_worked = false;
+	return;
 }
 
 void aod_enter_handler(struct work_struct *work) {
