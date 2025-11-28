@@ -1,0 +1,18 @@
+#
+# Fan driver configuration
+#
+config SOC_FAN
+        tristate "Soc Fan"
+        default n
+       help
+          Say Y here if you use soc control fan.
+
+config PANAX_FAN
+        bool "Choose Power Supply For FAN"
+        default n
+        help
+           panax fan use qcom pmic power,this is needed to config y
+
+#config FAN_UPDATA
+#	bool "Fan updata"
+#	default n
