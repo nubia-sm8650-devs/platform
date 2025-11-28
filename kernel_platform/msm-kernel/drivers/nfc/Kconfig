@@ -74,3 +74,5 @@ endmenu
 
 #Add by zte for nfc chip st54j.
 source "drivers/nfc/st54j/Kconfig"
+source "drivers/nfc/nxpntag/Kconfig"
+source "drivers/nfc/nxpwlc/Kconfig"
