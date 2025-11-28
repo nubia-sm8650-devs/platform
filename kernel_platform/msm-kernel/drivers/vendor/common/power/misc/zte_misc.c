@@ -350,6 +350,9 @@ struct zte_misc_ops node_ops_list[] = {
 	{"wls_nu_ver", NULL, NULL, NULL, NULL},
 	{"wls_nu_sleep", NULL, NULL, NULL, NULL},
 	{"zlog_enable_test", NULL, NULL, NULL, NULL},
+	/*nxp wlc node*/
+	{"wls_tx_capacity", NULL, NULL, NULL, NULL},
+	{"wls_tx_charging_status", NULL, NULL, NULL, NULL},
 };
 
 static int zte_misc_common_callback_set(const char *val, const struct kernel_param *kp)
@@ -470,6 +473,10 @@ module_param_cb(wls_nu_fw_update, &zte_misc_common_callback, NULL, 0644);
 module_param_cb(wls_nu_ver, &zte_misc_common_callback, NULL, 0644);
 module_param_cb(wls_nu_sleep, &zte_misc_common_callback, NULL, 0644);
 module_param_cb(zlog_enable_test, &zte_misc_common_callback, NULL, 0664);
+
+/*nxp wlc node*/
+module_param_cb(wls_tx_capacity, &zte_misc_common_callback, NULL, 0644);
+module_param_cb(wls_tx_charging_status, &zte_misc_common_callback, NULL, 0644);
 
 int zte_misc_register_callback(struct zte_misc_ops * node_ops, void * arg)
 {

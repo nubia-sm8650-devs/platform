@@ -741,6 +741,10 @@ void pm_subsystems_init(void)
 
 	for (i = 0; i < n_subsystems; i++) {
 
+#ifdef CONFIG_PMLOG_PAD
+    subsystems_str_8550[0] = "null";
+#endif
+
 #if CONFIG_VENDOR_PMLOG_PLATFORM == 8550
         name = subsystems_str_8550[i];
 #else

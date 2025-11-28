@@ -471,7 +471,8 @@ static int goodix_fw_version_compare(struct fw_update_ctrl *fwu_ctrl)
 		ts_info("active firmware version = firmware file version , not update");
 	} else {
 		fw_update_low_flag = true;
-		ts_info("active firmware version > firmware file version , not update");
+		ts_info("active firmware version > firmware file version , still update");
+		return COMPARE_FW_NOTEQUAL;
 	}
 
 	/* compare config id */

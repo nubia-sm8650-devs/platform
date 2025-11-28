@@ -3,6 +3,7 @@ source "drivers/vendor/common/touchscreen_v2/focaltech_touch_3681/Kconfig"
 source "drivers/vendor/common/touchscreen_v2/goodix_berlin_driver_v2/Kconfig"
 source "drivers/vendor/common/touchscreen_v2/goodix_berlin_driver_9916r/Kconfig"
 source "drivers/vendor/common/touchscreen_v2/goodix_berlin_driver_9966/Kconfig"
+source "drivers/vendor/common/touchscreen_v2/nt36xxx_touch_36532w/Kconfig"
 
 config TOUCHSCREEN_BOARD_NAME
 	string "config board firmware folder"

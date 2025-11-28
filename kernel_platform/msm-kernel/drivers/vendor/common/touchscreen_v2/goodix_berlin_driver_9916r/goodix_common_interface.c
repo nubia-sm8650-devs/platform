@@ -118,11 +118,38 @@ static int tpd_set_singleaodgesture(struct ztp_device *cdev, int enable)
 		ts_err("%s: error, change set in suspend!", __func__);
 	} else {
 		core_data->ztec.is_single_aod = mark;
-		core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp;
+		core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp | core_data->ztec.is_single_game;
 	}
 	ts_info("core_data->ztec.is_single_fp=%d", core_data->ztec.is_single_fp);
 	ts_info("core_data->ztec.is_single_aod=%d", core_data->ztec.is_single_aod);
 	ts_info("core_data->ztec.is_single_tap=%d", core_data->ztec.is_single_tap);
+	return 0;
+}
+
+static int tpd_get_singlegamegesture(struct ztp_device *cdev)
+{
+	struct goodix_ts_core *core_data = (struct goodix_ts_core *)cdev->private;
+
+	cdev->b_single_game_enable = core_data->ztec.is_single_game;
+	ts_info("%s: enter!, core_data->ztec.is_single_game=%d", __func__, core_data->ztec.is_single_game);
+	ts_info("%s: enter!, cdev->b_single_game_enable=%d", __func__, cdev->b_single_game_enable);
+	return 0;
+}
+
+static int tpd_set_singlegamegesture(struct ztp_device *cdev, int enable)
+{
+	struct goodix_ts_core *core_data = (struct goodix_ts_core *)cdev->private;
+
+	if (atomic_read(&core_data->suspended)) {
+		ts_err("%s: error, change set in suspend!", __func__);
+	} else {
+		core_data->ztec.is_single_game = enable;
+		core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp | core_data->ztec.is_single_game;
+	}
+	ts_info("core_data->ztec.is_single_fp=%d", core_data->ztec.is_single_fp);
+	ts_info("core_data->ztec.is_single_aod=%d", core_data->ztec.is_single_aod);
+	ts_info("core_data->ztec.is_single_tap=%d", core_data->ztec.is_single_tap);
+	ts_info("core_data->ztec.is_single_game=%d", core_data->ztec.is_single_game);
 	return 0;
 }
 
@@ -153,7 +180,7 @@ static int tpd_set_singlefpgesture(struct ztp_device *cdev, int enable)
 		ts_err("%s: error, change set in suspend!", __func__);
 	} else {
 		core_data->ztec.is_single_fp = mark;
-		core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp;
+		core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp | core_data->ztec.is_single_game;
 	}
 	ts_info("core_data->ztec.is_single_fp=%d", core_data->ztec.is_single_fp);
 	ts_info("core_data->ztec.is_single_aod=%d", core_data->ztec.is_single_aod);
@@ -387,6 +414,35 @@ static int tpd_get_follow_hand_level(struct ztp_device *cdev)
 	return 0;
 }
 
+static int tpd_set_stability_level(struct ztp_device *cdev, int tp_stability_level)
+{
+	struct goodix_ts_core *core_data = (struct goodix_ts_core *)cdev->private;
+	const struct goodix_ts_hw_ops *hw_ops = core_data->hw_ops;
+	int ret = 0;
+
+	if (tp_stability_level > 4)
+		tp_stability_level = 4;
+	core_data->ztec.stability_level = tp_stability_level;
+	if (atomic_read(&core_data->suspended)) {
+		ts_err("%s: error, change set in suspend!", __func__);
+	} else {
+		ret = hw_ops->set_stability_level(core_data, tp_stability_level);
+		if (ret)
+			ts_err("set stability_level mode failed!");
+	}
+
+	return 0;
+}
+
+static int tpd_get_stability_level(struct ztp_device *cdev)
+{
+	struct goodix_ts_core *core_data = (struct goodix_ts_core *)cdev->private;
+
+	cdev->stability_level = core_data->ztec.stability_level;
+
+	return 0;
+}
+
 static int tpd_set_play_game(struct ztp_device *cdev, int enable)
 {
 	struct goodix_ts_core *core_data = (struct goodix_ts_core *)cdev->private;
@@ -395,15 +451,16 @@ static int tpd_set_play_game(struct ztp_device *cdev, int enable)
 
 	if (core_data->init_stage < CORE_INIT_STAGE2 || atomic_read(&core_data->suspended)) {
 		/* we can not play game in black screen */
+		core_data->ztec.is_play_game = enable;
 		ts_err("%s: error, change set in suspend!", __func__);
 	} else {
-		core_data->ztec.is_play_game = enable;
-		if (enable) {
-			ret = hw_ops->set_zte_play_game(core_data, enable);
-			ts_info("enter_play_game success\n");
+		if (core_data->ztec.is_play_game == enable) {
+			ts_info("play no need reset");
+			return 0;
 		} else {
+			core_data->ztec.is_play_game = enable;
 			ret = hw_ops->set_zte_play_game(core_data, enable);
-			ts_info("leave_play_game success!\n");
+			ts_info("play_game set %d success\n", enable);
 		}
 	}
 
@@ -666,6 +723,8 @@ void goodix_tpd_register_fw_class(struct goodix_ts_core *core_data)
 
 	tpd_cdev->get_singleaod = tpd_get_singleaodgesture;
 	tpd_cdev->set_singleaod = tpd_set_singleaodgesture;
+	tpd_cdev->get_singlegame = tpd_get_singlegamegesture;
+	tpd_cdev->set_singlegame = tpd_set_singlegamegesture;
 
 #ifdef CONFIG_TOUCHSCREEN_UFP_MAC
 	tpd_cdev->get_singletap = tpd_get_singlefpgesture;
@@ -688,6 +747,9 @@ void goodix_tpd_register_fw_class(struct goodix_ts_core *core_data)
 
 	tpd_cdev->get_follow_hand_level = tpd_get_follow_hand_level;
 	tpd_cdev->set_follow_hand_level = tpd_set_follow_hand_level;
+
+	tpd_cdev->get_stability_level = tpd_get_stability_level;
+	tpd_cdev->set_stability_level = tpd_set_stability_level;
 
 	tpd_cdev->get_rotation_limit_level = tpd_get_rotation_limit_level;
 	tpd_cdev->set_rotation_limit_level = tpd_set_rotation_limit_level;

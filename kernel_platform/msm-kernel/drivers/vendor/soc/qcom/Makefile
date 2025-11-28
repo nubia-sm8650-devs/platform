@@ -4,3 +4,4 @@ obj-y           += pmlog/
 obj-y           += stats_info/
 obj-y           += rchip/
 obj-y           += tiantong/
+obj-y           += btkeyboard/

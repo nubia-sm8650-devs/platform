@@ -487,6 +487,7 @@ struct goodix_ts_hw_ops {
 	int (*set_tp_report_rate)(struct goodix_ts_core *cd, int mode);
 	int (*set_sensibility)(struct goodix_ts_core *cd, u8 mode);
 	int (*set_follow_hand_level)(struct goodix_ts_core *cd, int mode);
+	int (*set_stability_level)(struct goodix_ts_core *cd, int mode);
 	int (*set_zte_play_game)(struct goodix_ts_core *cd, int enable);
 #ifdef GOODIX_USB_DETECT_GLOBAL
 	int (*set_enter_charger)(struct goodix_ts_core *cd);
@@ -524,6 +525,7 @@ struct zte_ctl {
 	int is_single_tap;
 	int is_single_aod;
 	int is_single_fp;
+	int is_single_game;
 	int is_set_single_in_suspend;
 	int is_wakeup_gesture;
 	int is_set_wakeup_in_suspend;
@@ -541,6 +543,7 @@ struct zte_ctl {
 	int tp_report_rate;
 	int sensibility_level;
 	int follow_hand_level;
+	int stability_level;
 	int display_rotation;
 	int rotation_limit_level;
 	int level;

@@ -42,6 +42,7 @@
 #define PROC_TOUCH_MROTATION		"mRotation"
 #define PROC_TOUCH_TP_SINGLETAP		"single_tap"
 #define PROC_TOUCH_TP_SINGLEAOD		"single_aod"
+#define PROC_TOUCH_TP_SINGLEGAME		"single_game"
 #define PROC_TOUCH_GET_NOISE		"get_noise"
 #define PROC_TOUCH_EDGE_REPORT_LIMIT		"edge_report_limit"
 #define PROC_TOUCH_ONEKEY			"one_key"
@@ -55,6 +56,7 @@
 #define PROC_TOUCH_TP_PALM_MODE		"tp_palm_mode"
 #define PROC_TOUCH_TP_FOLD_STATE	"fold_state"
 #define PROC_TOUCH_FAKE_SLEEP			"fake_sleep"
+#define PROC_TOUCH_STABILITY_LEVEL    "stability_level"
 #ifdef TOUCH_DOWN_UP_ZLOG
 #define PROC_TOUCH_GHOST_DEBUG		"ghost_debug"
 #endif
@@ -147,6 +149,14 @@ enum {
 	follow_hand_level_2 = 2,
 	follow_hand_level_3 = 3,
 	follow_hand_level_4 = 4,
+};
+
+enum {
+	stability_level_0 = 0,
+	stability_level_1 = 1,
+	stability_level_2 = 2,
+	stability_level_3 = 3,
+	stability_level_4 = 4,
 };
 
 enum {
@@ -303,10 +313,12 @@ struct ztp_device {
 	u32 fw_data_pos;
 	int b_single_tap_enable;
 	int b_single_aod_enable;
+	int b_single_game_enable;
 	int one_key_enable;
 	int play_game_enable;
 	int tp_report_rate;
 	int follow_hand_level;
+	int stability_level;
 	int sensibility_enable;
 	int finger_lock_flag;
 	int palm_mode_en;
@@ -396,6 +408,8 @@ struct ztp_device {
 	int (*set_singletap)(struct ztp_device *cdev, int enable);
 	int (*get_singleaod)(struct ztp_device *cdev);
 	int (*set_singleaod)(struct ztp_device *cdev, int enable);
+	int (*get_singlegame)(struct ztp_device *cdev);
+	int (*set_singlegame)(struct ztp_device *cdev, int enable);
 	int (*get_noise)(struct ztp_device *cdev);
 	int (*get_one_key)(struct ztp_device *cdev);
 	int (*set_one_key)(struct ztp_device *cdev, int enable);
@@ -405,6 +419,8 @@ struct ztp_device {
 	int (*get_tp_report_rate)(struct ztp_device *cdev);
 	int (*set_follow_hand_level)(struct ztp_device *cdev, int enable);
 	int (*get_follow_hand_level)(struct ztp_device *cdev);
+	int (*set_stability_level)(struct ztp_device *cdev, int enable);
+	int (*get_stability_level)(struct ztp_device *cdev);
 	int (*set_sensibility_leve)(struct ztp_device *cdev, u8 level);
 	int (*set_gpio_mode)(struct ztp_device *cdev, u8 mode);
 	int (*get_sensibility)(struct ztp_device *cdev);
