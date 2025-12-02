@@ -107,3 +107,4 @@ zte_stats_info.ko
 msm_rtb.ko
 zlog_exception_dlkm.ko
 zlog_common_dlkm.ko
+zte_ramdisk_reboot.ko

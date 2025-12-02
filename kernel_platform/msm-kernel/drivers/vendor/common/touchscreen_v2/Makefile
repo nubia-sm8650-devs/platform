@@ -87,4 +87,13 @@ zte_tpd-$(CONFIG_TOUCHSCREEN_FTS_3681) += \
 	focaltech_touch_3681/focaltech_test/supported_ic/focaltech_test_ft3681.o \
 
 ######################################################
+
+zte_tpd-$(CONFIG_TOUCHSCREEN_NT36XXX_TOUCH_36532W) += \
+	nt36xxx_touch_36532w/nt36xxx.o \
+	nt36xxx_touch_36532w/nt36xxx_fw_update.o \
+	nt36xxx_touch_36532w/nt36xxx_ext_proc.o \
+	nt36xxx_touch_36532w/nt36xxx_mp_ctrlram.o \
+	nt36xxx_touch_36532w/nt36xxx_common_interface.o \
+
+######################################################
 obj-m += zte_tpd.o

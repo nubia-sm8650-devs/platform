@@ -97,7 +97,11 @@ struct nb_chip {
 
 struct nb_chip *chip = NULL;
 
+#ifdef CONFIG_PANAX_FAN
+static int nb_fan_power_set(struct regulator *pwr_reg, bool enable);
+#else
 static int nb_fan_power_set(struct fan_dev *fan, bool enable);
+#endif
 
 static int led_stat_set(struct led_dev led)
 {
@@ -136,10 +140,20 @@ static int fan_level_set(struct fan_dev *fan, u8 level)
 	    FAN_DBG("fan have in level=%d.\n", level);
 		return 0;
  	}
+
+#ifdef CONFIG_PANAX_FAN
+	//use qcom pmic power
+	if(level==FAN_LEVEL_0)
+	    nb_fan_power_set(chip->avdd_ldo, false);
+	else
+	    nb_fan_power_set(chip->avdd_ldo, true);
+#else
+	//use ldo power
 	if(level==FAN_LEVEL_0)
 	    nb_fan_power_set(chip->fan, false);
 	else
 	    nb_fan_power_set(chip->fan, true);
+#endif
 
 	pwm_get_state(fan->pwm_dev, &pstate);
 	pstate.enabled = (level==FAN_LEVEL_0)?false:true;
@@ -176,19 +190,14 @@ static int fan_pwm_set(struct fan_dev *fan, u8 pwm)
 
 	return rc;
 }
-static int nb_fan_power_set(struct fan_dev *fan, bool enable)
+
+#ifdef CONFIG_PANAX_FAN
+//use qcom pmic power
+static int nb_fan_power_set(struct regulator *pwr_reg, bool enable)
 {
 	int ret = 0;
 
-	if(enable) {
-	    gpio_direction_output(chip->fan->en_gpio, 1);
-	    FAN_DBG("NB_FAN: open fan power!\n");
-	}
-	else {
-	    gpio_direction_output(chip->fan->en_gpio, 0);
-	    FAN_DBG("NB_FAN: close fan power!\n");
-	}
-	/*if (enable==false && pwr_reg) {
+	if (enable==false && pwr_reg) {
 		if (regulator_is_enabled(pwr_reg) !=0){
 			ret = regulator_disable(pwr_reg);
 			FAN_DBG("NB_FAN: close fan power!ret=%d.\n", ret);
@@ -201,12 +210,32 @@ static int nb_fan_power_set(struct fan_dev *fan, bool enable)
 			msleep(10);
 			FAN_DBG("NB_FAN: open fan power!ret=%d.\n", ret);
 		}
-	}*/
-	msleep(100);
-	FAN_DBG("Fan pwoer gpio status:%d", gpio_get_value(chip->fan->en_gpio));
+	}
 
    return ret;
 }
+#else
+//use ldo power
+static int nb_fan_power_set(struct fan_dev *fan, bool enable)
+{
+	int ret = 0;
+
+	if(enable) {
+	    gpio_direction_output(chip->fan->en_gpio, 1);
+	    FAN_DBG("NB_FAN: open fan power!\n");
+	}
+	else {
+	    gpio_direction_output(chip->fan->en_gpio, 0);
+	    FAN_DBG("NB_FAN: close fan power!\n");
+	}
+
+	msleep(100);
+	FAN_DBG("Fan pwoer gpio status:%d", gpio_get_value(chip->fan->en_gpio));
+
+
+   return ret;
+}
+#endif
 irqreturn_t fan_speed_irq_proc(int irq, void *dev_id)
 {
 	struct nb_chip *chip = (struct nb_chip *)dev_id;
@@ -352,10 +381,19 @@ static int nb_fan_rpm_check(u32 rpm)
 
 	level = chip->fan->level;
 	fan_level_set(chip->fan, FAN_LEVEL_0);
+
+#ifdef CONFIG_PANAX_FAN
+	//use qcom pmic power
+	nb_fan_power_set(chip->avdd_ldo, false);
+	msleep(50);
+	nb_fan_power_set(chip->avdd_ldo, true);
+	fan_level_set(chip->fan, level);
+#else
+	//use ldo power
 	nb_fan_power_set(chip->fan, false);
 	msleep(50);
 	nb_fan_power_set(chip->fan, true);
-	fan_level_set(chip->fan, level);
+#endif
 	
 	FAN_DBG("fan level=%d rpm=%d error! NB.%d reset fan !", chip->fan->level, rpm, rst_cnt);
 	
@@ -664,7 +702,7 @@ static int nb_fan_parse_dt(struct nb_chip *chip)
 	return rc;
 }
 
-/*
+#ifdef CONFIG_PANAX_FAN
 static int nb_fan_power_proc(struct nb_chip *chip)
 {
 	int ret = 0;
@@ -697,18 +735,21 @@ static int nb_fan_power_proc(struct nb_chip *chip)
 	}else{
 		FAN_DBG("Regulator vdd_fan is disabled!\n");
 	}
-	ret = regulator_enable(chip->avdd_ldo);
+	/*ret = regulator_enable(chip->avdd_ldo);
 	if (ret) {
 		FAN_DBG("fan Regulator enable failed rc=%d\n", ret);
 		return ret;
-	}
+	}*/
+
 	return ret;
 }
-*/
+#else
+// use ldo power
 static int nb_fan_power_proc(struct nb_chip *chip)
 {
 	return 0;
 }
+#endif
 
 static int nb_fan_pinctrl_proc(struct nb_chip *chip)
 {
@@ -768,7 +809,11 @@ static int nb_fan_gpio_proc(struct nb_chip *chip)
 		return chip->fan->pwm_gpio;
 	}
 	FAN_DBG("pwm gpio status is:%d.", gpio_get_value(chip->fan->pwm_gpio));
-	
+
+#ifdef CONFIG_PANAX_FAN
+
+#else
+// use ldo power
 	chip->fan->en_gpio =of_get_named_gpio(np, "fan,en-gpio", 0);
 	if(chip->fan->en_gpio < 0){
 		FAN_DBG("Find en_gpio failed!\n");
@@ -782,7 +827,7 @@ static int nb_fan_gpio_proc(struct nb_chip *chip)
 	FAN_DBG("fan power enable gpio status is:%d.", gpio_get_value(chip->fan->en_gpio));
 	gpio_direction_output(chip->fan->en_gpio, 0);
 	FAN_DBG("fan power enable gpio init status is:%d.", gpio_get_value(chip->fan->en_gpio));
-
+#endif
 	return 0;
 }
 

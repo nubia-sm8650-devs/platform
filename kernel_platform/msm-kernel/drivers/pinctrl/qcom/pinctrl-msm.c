@@ -1010,9 +1010,7 @@ unsigned gpio_drv_store_pm(int *id, struct gpio_chip *chip, u32 values)
 static bool skip_special_gpios(int i)
 {
 
-	if ((i == 0) || (i == 1) || (i == 2) || (i == 3)
-			|| (i == 36) || (i == 37) || (i == 38) || (i == 39)
-			) {
+	if ((i == 40) || (i == 41) || (i == 42) || (i == 43)) {
 		pr_info("msm_dump_gpios skip gpio %d to avoid system crash\n", i);
 		return true;
 	} else {

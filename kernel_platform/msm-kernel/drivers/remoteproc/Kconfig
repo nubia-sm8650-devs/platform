@@ -172,6 +172,13 @@ config QCOM_Q6V5_COMMON
 	depends on ARCH_QCOM
 	depends on QCOM_SMEM
 
+config VENDOR_ZLOG_RESET_REASON
+	tristate "ZTE LOG RESET REASON"
+	depends on QCOM_Q6V5_COMMON
+	help
+	  Say Y here, if supported zte log reset reason
+	  may depend on CONFIG_POWER_RESET_QCOM_REBOOT_REASON
+
 config QCOM_Q6V5_ADSP
 	tristate "Qualcomm Technology Inc ADSP Peripheral Image Loader"
 	depends on OF && ARCH_QCOM

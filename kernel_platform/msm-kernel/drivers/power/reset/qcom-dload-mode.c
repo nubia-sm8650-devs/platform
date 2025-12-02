@@ -17,6 +17,10 @@
 #include <linux/panic_notifier.h>
 #include <linux/qcom_scm.h>
 #include <soc/qcom/minidump.h>
+#ifdef CONFIG_VENDOR_PANIC_SIMULATION
+#include <linux/string.h>
+extern int zte_set_wdt_trigger_flag(void);
+#endif
 
 enum qcom_download_dest {
 	QCOM_DOWNLOAD_DEST_UNKNOWN = -1,
@@ -106,6 +110,26 @@ static int param_set_download_mode(const char *val,
 		const struct kernel_param *kp)
 {
 	int ret;
+#ifdef CONFIG_VENDOR_PANIC_SIMULATION
+	/* Started by AICoder, pid:2a41619a91q60cc1459409a820d0c11243b6b16a */
+	int a = 4;
+
+	if (val && strncmp(val, "nullcrash", 9) == 0) {
+		pr_info("ztedbg %s: simulate null crash\n", __func__);
+		pr_info("ztedbg %d trigger null crash\n", *(int *)((uintptr_t)a));
+	    return -1;
+	} else if (val && strncmp(val, "bugoncrash", 10) == 0) {
+		pr_info("ztedbg %s: simulate bugon crash\n", __func__);
+		BUG();
+		return -1;
+	} else if (val && strncmp(val, "wdtbark", 7) == 0) {
+		pr_info("ztedbg %s: simulate wdt bark %d\n", __func__, zte_set_wdt_trigger_flag());
+		return -1;
+	} else {
+		pr_info("ztedbg %s: download mode set\n", val);
+	}
+	/* Ended by AICoder, pid:2a41619a91q60cc1459409a820d0c11243b6b16a */
+#endif
 
 	/* update enable_dump according to user input */
 	ret = param_set_bool(val, kp);

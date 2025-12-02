@@ -26,7 +26,9 @@ obj-$(CONFIG_INPUT_JOYSTICK)	+= joystick/
 obj-$(CONFIG_INPUT_TABLET)	+= tablet/
 obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
 obj-y += fingerprint/goodix/
+obj-y += fingerprint/silead/
 obj-$(CONFIG_SENSORS_HALL_AH1898)+= hall/
+obj-$(CONFIG_SENSORS_HALL2_AH1898)+= hall2/
 obj-$(CONFIG_INPUT_MISC)	+= misc/
 
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o

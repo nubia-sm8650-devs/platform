@@ -38,6 +38,7 @@ obj-$(CONFIG_QCOM_SOCINFO)	+= socinfo.o
 obj-$(CONFIG_QCOM_DCC_V2) += dcc_v2.o
 obj-$(CONFIG_QCOM_SPM)		+= spm.o
 obj-$(CONFIG_QCOM_WDT_CORE) += qcom_wdt_core.o
+obj-$(CONFIG_VENDOR_RAMDISK_ZLOG_REASON) += zte_ramdisk_reboot.o
 obj-$(CONFIG_QCOM_SOC_WATCHDOG) += qcom_soc_wdt.o
 obj-$(CONFIG_QCOM_STATS)	+= qcom_stats.o
 obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpm_master_stat.o

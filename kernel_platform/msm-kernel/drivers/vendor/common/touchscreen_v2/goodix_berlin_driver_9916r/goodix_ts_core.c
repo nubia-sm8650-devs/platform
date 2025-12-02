@@ -2152,12 +2152,12 @@ out:
 	//ret = hw_ops->set_tp_report_rate(core_data, core_data->ztec.tp_report_rate);
 
 #ifdef CONFIG_TOUCHSCREEN_UFP_MAC
-	core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp;
+	core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp | core_data->ztec.is_single_game;
 	core_data->ztec.is_wakeup_gesture = core_data->ztec.is_set_wakeup_in_suspend;
 	core_data->ztec.is_one_key = core_data->ztec.is_set_onekey_in_suspend;
 	core_data->ztec.is_fake_sleep = core_data->ztec.is_fake_sleep_in_suspend;
 #else
-	core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp;
+	core_data->ztec.is_single_tap = core_data->ztec.is_single_aod | core_data->ztec.is_single_fp | core_data->ztec.is_single_game;
 	core_data->ztec.is_wakeup_gesture = core_data->ztec.is_set_wakeup_in_suspend;
 #endif
 
@@ -2651,6 +2651,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	core_data->ztec.is_palm_mode = 0;
 	core_data->ztec.sensibility_level = 2;
 	core_data->ztec.follow_hand_level = 2;
+	core_data->ztec.stability_level = 2;
 	core_data->ztec.rotation_limit_level = 1;
 	core_data->ztec.is_fake_sleep = 0;
 	core_data->ztec.is_fake_sleep_in_suspend = 0;

@@ -1,0 +1,11 @@
+#
+# Nxp NFC wireless(I2C) devices
+#
+
+config NFC_CTN730
+	tristate "NCI based NFC Driver for CTN730"
+	depends on I2C
+	help
+	  This enables the NFC driver for CTN730 based devices.
+	  This is for i2c connected with NFC controller.
+	

@@ -149,6 +149,7 @@ enum battery_property_id {
 	BATT_PMIC_TEMP,
 	BATT_SMB139X_TEMP1,
 	BATT_SMB139X_TEMP2,
+	BATT_BATTERY_CYCLE,
 #endif
 	BATT_PROP_MAX,
 };
@@ -3485,6 +3486,37 @@ static ssize_t batt_smb139x_temp2_show(struct class *c, struct class_attribute *
 	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[BATT_SMB139X_TEMP2]);
 }
 static CLASS_ATTR_RO(batt_smb139x_temp2);
+static ssize_t battery_cycle_store(struct class *c, struct class_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
+	int rc = 0;
+	u32 ucount = 0;
+
+	if (kstrtou32(buf, 10, &ucount))
+		return -EINVAL;
+	pr_info("store battery_cycle=%d\n", ucount);
+	rc = write_property_id(bcdev, pst, BATT_BATTERY_CYCLE, ucount);
+
+	return count;
+}
+static ssize_t battery_cycle_show(struct class *c, struct class_attribute *attr,
+			char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
+	int rc;
+
+	rc = read_property_id(bcdev, pst, BATT_BATTERY_CYCLE);
+	if (rc < 0)
+		return rc;
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[BATT_BATTERY_CYCLE]);
+}
+static CLASS_ATTR_RW(battery_cycle);
 
 static struct attribute *battery_class_attrs[] = {
 	&class_attr_soh.attr,
@@ -3523,6 +3555,7 @@ static struct attribute *battery_class_attrs[] = {
 	&class_attr_batt_pmic_temp.attr,
 	&class_attr_batt_smb139x_temp1.attr,
 	&class_attr_batt_smb139x_temp2.attr,
+	&class_attr_battery_cycle.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(battery_class);

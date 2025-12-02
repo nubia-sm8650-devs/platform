@@ -763,6 +763,44 @@ static ssize_t tp_single_aod_write(struct file *file,
 	return len;
 }
 
+static ssize_t tp_single_game_read(struct file *file,
+					 char __user *buffer, size_t count, loff_t *offset)
+{
+	ssize_t len = 0;
+	uint8_t data_buf[10] = {0};
+	struct ztp_device *cdev = tpd_cdev;
+
+	if (*offset != 0)
+		return 0;
+
+	if (cdev->get_singlegame)
+		cdev->get_singlegame(cdev);
+
+	pr_notice("tpd: %s val: %d.\n", __func__, cdev->b_single_game_enable);
+	len = snprintf(data_buf, sizeof(data_buf), "%u\n", cdev->b_single_game_enable);
+	return simple_read_from_buffer(buffer, count, offset, data_buf, len);
+}
+
+static ssize_t tp_single_game_write(struct file *file,
+				const char __user *buffer, size_t len, loff_t *off)
+{
+	int ret = 0;
+	unsigned int input = 0;
+	struct ztp_device *cdev = tpd_cdev;
+
+	ret = kstrtouint_from_user(buffer, len, 10, &input);
+	if (ret)
+		return -EINVAL;
+
+	input = input > 0 ? 5 : 0;
+	pr_notice("tpd: %s val = %d\n", __func__, input);
+
+	if (cdev->set_singlegame)
+		cdev->set_singlegame(cdev, input);
+
+	return len;
+}
+
 static ssize_t tp_edge_report_limit_read(struct file *file,
 					 char __user *buffer, size_t count, loff_t *offset)
 {
@@ -1095,6 +1133,46 @@ static ssize_t set_follow_hand_level(struct file *file,
 
 	if (cdev->set_follow_hand_level) {
 		cdev->set_follow_hand_level(cdev, input);
+	}
+
+	return len;
+}
+
+static ssize_t get_stability_level(struct file *file,
+					 char __user *buffer, size_t count, loff_t *offset)
+{
+	ssize_t len = 0;
+	uint8_t data_buf[10] = {0};
+	struct ztp_device *cdev = tpd_cdev;
+
+	if (*offset != 0) {
+		return 0;
+	}
+	if (cdev->get_stability_level) {
+		cdev->get_stability_level(cdev);
+	}
+	pr_notice("tpd: %s val:%d.\n", __func__, cdev->stability_level);
+	len = snprintf(data_buf, sizeof(data_buf), "%u\n", cdev->stability_level);
+	return simple_read_from_buffer(buffer, count, offset, data_buf, len);
+}
+
+static ssize_t set_stability_level(struct file *file,
+				const char __user *buffer, size_t len, loff_t *off)
+{
+	int ret = 0;
+	unsigned int input = 0;
+	struct ztp_device *cdev = tpd_cdev;
+
+	ret = kstrtouint_from_user(buffer, len, 10, &input);
+	if (ret)
+		return -EINVAL;
+
+	/*input = input > 0 ? 1 : 0;*/
+
+	pr_notice("tpd: %s val = %d\n", __func__, input);
+
+	if (cdev->set_stability_level) {
+		cdev->set_stability_level(cdev, input);
 	}
 
 	return len;
@@ -1752,6 +1830,11 @@ static const struct proc_ops proc_ops_single_aod = {
 	.proc_write = tp_single_aod_write,
 };
 
+static const struct proc_ops proc_ops_single_game = {
+	.proc_read = tp_single_game_read,
+	.proc_write = tp_single_game_write,
+};
+
 static const struct proc_ops proc_ops_get_noise = {
 	.proc_read = get_tp_noise_show,
 	.proc_write = get_tp_noise_store,
@@ -1780,6 +1863,11 @@ static const struct proc_ops proc_ops_tp_report_rate = {
 static const struct proc_ops proc_ops_follow_hand_level = {
 	.proc_read = get_follow_hand_level,
 	.proc_write = set_follow_hand_level,
+};
+
+static const struct proc_ops proc_ops_stability_level = {
+	.proc_read = get_stability_level,
+	.proc_write = set_stability_level,
 };
 
 static const struct proc_ops proc_ops_sensibility_level = {
@@ -1874,6 +1962,9 @@ static void create_tpd_proc_entry(void)
 	tpd_proc_entry = proc_create(PROC_TOUCH_TP_SINGLEAOD, 0664, tpd_proc_dir, &proc_ops_single_aod);
 	if (tpd_proc_entry == NULL)
 		pr_err("proc_create single_aod failed!\n");
+	tpd_proc_entry = proc_create(PROC_TOUCH_TP_SINGLEGAME, 0664, tpd_proc_dir, &proc_ops_single_game);
+	if (tpd_proc_entry == NULL)
+		pr_err("proc_create single_game failed!\n");
 	tpd_proc_entry = proc_create(PROC_TOUCH_GET_NOISE, 0664, tpd_proc_dir, &proc_ops_get_noise);
 	if (tpd_proc_entry == NULL)
 		pr_err("proc_create get_noise failed!\n");
@@ -1892,6 +1983,9 @@ static void create_tpd_proc_entry(void)
 	tpd_proc_entry = proc_create(PROC_TOUCH_FOLLOW_HAND_LEVEL, 0664,  tpd_proc_dir, &proc_ops_follow_hand_level);
 	if (tpd_proc_entry == NULL)
 		pr_err("proc_create follow_hand level failed!\n");
+	tpd_proc_entry = proc_create(PROC_TOUCH_STABILITY_LEVEL, 0664,  tpd_proc_dir, &proc_ops_stability_level);
+	if (tpd_proc_entry == NULL)
+		pr_err("proc_create stability level failed!\n");
 	tpd_proc_entry = proc_create(PROC_TOUCH_SENSIBILITY, 0664, tpd_proc_dir, &proc_ops_sensibility_level);
 	if (tpd_proc_entry == NULL)
 		pr_err("proc_create sensilibity failed!\n");
@@ -2301,7 +2395,9 @@ static void ztp_probe_work(struct work_struct *work)
 #ifdef CONFIG_TOUCHSCREEN_CHSC5XXX
 	semi_i2c_device_init();
 #endif
-
+#ifdef CONFIG_TOUCHSCREEN_NT36XXX_TOUCH_36532W
+	nvt_driver_init();
+#endif
 }
 
 void tpd_probe_work_init(void)
@@ -2529,6 +2625,9 @@ static void __exit zte_touch_exit(void)
 #endif
 #ifdef CONFIG_TOUCHSCREEN_CHSC5XXX
 	semi_i2c_device_exit();
+#endif
+#ifdef CONFIG_TOUCHSCREEN_NT36XXX_TOUCH_36532W
+	nvt_driver_exit();
 #endif
 	zte_touch_deinit();
 	platform_driver_unregister(&zte_touch_device_driver);

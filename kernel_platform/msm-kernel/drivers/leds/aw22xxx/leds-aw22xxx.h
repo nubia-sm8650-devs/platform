@@ -1,6 +1,10 @@
 #ifndef __AW22XXX_H__
 #define __AW22XXX_H__
 
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+#include <vendor/comdef/zlog_common_base.h>
+#endif
+
 #define NUBIA_MULTICOLOR_LED
 
 /*********************************************************
@@ -117,6 +121,7 @@ struct aw22xxx {
     struct work_struct task_work;
     struct work_struct fw_work;
     struct work_struct cfg_work;
+    struct work_struct recover_work;
 #ifdef AWINIC_FW_UPDATE_DELAY
     struct hrtimer fw_timer;
 #endif
@@ -134,10 +139,12 @@ struct aw22xxx {
     unsigned int imax;
     unsigned int fw_version;
 
+    unsigned int task_irq;//watch_dog
+
     unsigned char task0;
     unsigned char task1;
 
-    unsigned char effect;
+    unsigned int effect;
     unsigned char cfg;
     unsigned int  pattern_status;
     unsigned int rgb[AW22XXX_RGB_MAX];
@@ -146,6 +153,10 @@ struct aw22xxx {
     struct aw22xxx_pinctrl pinctrl_info;
 #endif
     bool fan_led_stat;
+
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+struct zlog_client *zlog_aw22xxx_client;
+#endif
 };
 
 #endif

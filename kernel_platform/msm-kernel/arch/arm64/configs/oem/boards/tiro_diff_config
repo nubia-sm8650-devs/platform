@@ -35,3 +35,6 @@ CONFIG_NUBIA_DP=y
 CONFIG_SND_SMARTPA_AW882XX=y
 #add for charger skin thermal distinguish
 CONFIG_ZTE_FEATURE_CHG_BATT_2S=y
+
+#vib
+CONFIG_AWINIC_HAPTIC_HV=m

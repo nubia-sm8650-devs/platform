@@ -43,3 +43,4 @@ obj-$(CONFIG_TI_K3_DSP_REMOTEPROC)	+= ti_k3_dsp_remoteproc.o
 obj-$(CONFIG_TI_K3_R5_REMOTEPROC)	+= ti_k3_r5_remoteproc.o
 
 subdir-ccflags-y += -I$(srctree)/drivers/vendor/common/zlog/zlog_common
+obj-$(CONFIG_VENDOR_ZLOG_RESET_REASON) += zte_reboot_ext.o

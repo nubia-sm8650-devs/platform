@@ -29,6 +29,7 @@
 #include <linux/kthread.h>
 #include <asm/uaccess.h>
 #include <linux/leds.h>
+#include <linux/proc_fs.h>
 #include "leds-aw22xxx.h"
 #include "leds-aw22xxx-reg.h"
 
@@ -43,6 +44,8 @@
 #define AW22XXX_I2C_NAME "aw22xxx_led"
 
 #define AW22XXX_VERSION "v1.1.3"
+#define AW_DRV_VER11  11 //11=v1.1.3
+#define AW_DRV_VER15  15 //15=v1.5
 
 #define AW22_LOG(fmt, args...) printk(KERN_ERR "[aw22xx] [%s: %d] "fmt,  __func__, __LINE__, ##args)
 #ifdef NUBIA_MULTICOLOR_LED
@@ -54,9 +57,6 @@
 #define AW_I2C_RETRY_DELAY 1
 #define AW_READ_CHIPID_RETRIES 2
 #define AW_READ_CHIPID_RETRY_DELAY 1
-//add by jones 659S
-int multicolor_led = 0;
-
 /******************************************************
  *
  * aw22xxx led parameter
@@ -64,11 +64,68 @@ int multicolor_led = 0;
  ******************************************************/
 #define AW22XXX_CFG_NAME_MAX        64
 #define AW22XXX_CFG_CUSTOM_MAX      0x20
-#define AW22XXX_CFG_NUM_MAX         255
+#define AW22XXX_CFG_NUM_MAX         350 //255
+#define CFG_BASE_MAX                14 //touch_game2.bin
 
 #define LED_EFFECT_NOINIT_STR       "noinit"
 #define FW_NAME_DEFAULT             "aw22xxx_fw.bin"
 #define FW_NAME_NX669J_V1E          "aw22xxx_fw_nx669j_v1e.bin"
+#define PROC_COLORLEDS_ID           "driver/colorleds_id"
+
+#define BIT_FAN_ENABLE            1
+#define BIT_LAMP_ENABLE           2
+
+//add by jones 659S
+int multicolor_led = 0;
+static unsigned int fan_effect = 0;
+static unsigned int lamp_effect = 0;
+static unsigned int g_cfg_cur_state = 0;
+static u32 g_ver_var = AW_DRV_VER11;
+static u32 g_custom_en = 0;
+static bool g_init_flg = false;
+static char g_chip_id[32] = "-1";
+enum CFG_MODE_TYPE {
+	CFG_MODE_0, //steady lighting up
+	CFG_MODE_1, //breath
+    CFG_MODE_2, //flashing
+    CFG_MODE_3, //flow
+    CFG_MODE_4, //ripple
+    CFG_MODE_5, //echo
+    CFG_MODE_6, //hopping
+    CFG_MODE_7, //fast flashing
+    CFG_MODE_8, //follows the audio
+    CFG_MODE_9, //two flashing
+    CFG_MODE_MAX,
+};
+enum FAN_MODE_TYPE {
+    FAN_MODE_0, //steady lighting up
+	FAN_MODE_1, //breath
+    FAN_MODE_2, //flashing
+    FAN_MODE_3, //flow
+    FAN_MODE_4, //fast flashing
+    FAN_MODE_MAX,
+};
+
+static int cfg_mode_addr[CFG_MODE_MAX]={
+    0x60,
+    0x70,
+    0x80,
+    0xa0,
+    0xb0,
+    0xc0,
+    0xd0,
+    0xe0,
+    0x50,
+    0x90,
+};
+static int fan_mode_addr[FAN_MODE_MAX]={
+    0x101,
+    0x31,
+    0x21,
+    0x41,
+    0x111,
+};
+
 static char aw22xxx_fw_name[AW22XXX_CFG_NAME_MAX] = {0};
 
 static char aw22xxx_cfg_name[AW22XXX_CFG_NUM_MAX][AW22XXX_CFG_NAME_MAX] = {
@@ -80,9 +137,9 @@ static char aw22xxx_cfg_name[AW22XXX_CFG_NUM_MAX][AW22XXX_CFG_NAME_MAX] = {
 	{"left_red_off_noinit.bin"},
 	{"right_blue_on_noinit.bin"},
 	{"right_blue_off_noinit.bin"},
-	{"nubia_all_rgb_red.bin"},
-	{"nubia_all_rgb_green.bin"},
-	{"nubia_all_rgb_blue.bin"},
+	{"nubia_all_rgb_red.bin"}, 
+	{"nubia_all_rgb_green.bin"}, 
+	{"nubia_all_rgb_blue.bin"},  
 	{"touch_game0.bin"},
 	{"touch_game1.bin"},
 	{"touch_game2.bin"},
@@ -130,7 +187,7 @@ static char aw22xxx_imax_code[] = {
 #define CMD_LINE_LEN	25
 static unsigned  char user_para_data[CMD_LINE_NUMS*CMD_LINE_LEN] = {0};
 static unsigned int write_idx = 0,read_idx = 0;
-static unsigned char funcmp_flag = 0;
+//static unsigned char funcmp_flag = 0;
 struct task_struct *cfg_update_kthread;
 static unsigned char kthread_status = 0;
 static unsigned char duration = 0;
@@ -253,6 +310,18 @@ static unsigned char aw22xxx_led_off_cfg[] = {
 	0x04,0x01,//mcuctr
 	0x02,0x00,//gcr
 };
+
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+struct zlog_mod_info zlog_aw22xxx_dev = {
+	.module_no = ZLOG_MODULE_LED,
+	.name = "aw22xxx_led",
+	.device_name = "Unknown",
+	.ic_name = "Unknown",
+	.module_name = "LED",
+	.fops = NULL,
+};
+#endif
+
 /******************************************************
  *
  * aw22xxx i2c write/read
@@ -373,12 +442,13 @@ static int aw22xxx_reg_page_cfg(struct aw22xxx *aw22xxx, unsigned char page)
 static int aw22xxx_sw_reset(struct aw22xxx *aw22xxx)
 {
     aw22xxx_i2c_write(aw22xxx, REG_SRST, AW22XXX_SRSTW);
-    msleep(2);
+    usleep_range(2000, 3000);
     return 0;
 }
 
 static int aw22xxx_chip_enable(struct aw22xxx *aw22xxx, bool flag)
 {
+     AW22_LOG("flag=%d\n",flag);
     if(flag) {
         aw22xxx_i2c_write_bits(aw22xxx, REG_GCR,
                 BIT_GCR_CHIPEN_MASK, BIT_GCR_CHIPEN_ENABLE);
@@ -386,7 +456,7 @@ static int aw22xxx_chip_enable(struct aw22xxx *aw22xxx, bool flag)
         aw22xxx_i2c_write_bits(aw22xxx, REG_GCR,
                 BIT_GCR_CHIPEN_MASK, BIT_GCR_CHIPEN_DISABLE);
     }
-    msleep(2);
+    usleep_range(2000, 3000);
     return 0;
 }
 
@@ -411,6 +481,7 @@ static int  aw22xxx_blink_cfg_update_array(struct aw22xxx *aw22xxx)
 static int  aw22xxx_init_cfg_update_array(struct aw22xxx *aw22xxx)
 {
     pr_info("enter--%s---%d--\n",__func__,__LINE__);
+    aw22xxx_chip_enable(aw22xxx, true);
     aw22xxx_update_cfg_array(aw22xxx, lamp_init, sizeof(lamp_init)/sizeof(unsigned char));
     // pr_info("exit--%s---%d--\n",__func__,__LINE__);
     return 0;
@@ -711,6 +782,87 @@ static int aw22xxx_get_agc_gain(struct aw22xxx *aw22xxx, unsigned char *gain)
     }
     return ret;
 }
+
+static ssize_t
+aw22xxx_auden_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
+{
+	unsigned int databuf[1] = { 0 };
+	int ret = -1;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+
+    if(g_aud_en < 1){
+        dev_err(aw22xxx->dev, "%s: aud not support!", __func__);
+        return ret;
+    }
+
+	ret = kstrtou32(buf, 0, &databuf[0]);
+	if (ret < 0) {
+		dev_err(aw22xxx->dev, "%s: input data invalid!", __func__);
+		return ret;
+	}
+    if(databuf[0] > 1){
+        databuf[0] = 1;
+    }
+
+    aw22xxx_audio_enable(aw22xxx,databuf[0]);
+
+	return len;
+}
+
+static ssize_t
+aw22xxx_agcen_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
+{
+	unsigned int databuf[1] = { 0 };
+	int ret = -1;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+
+    if(g_aud_en < 1){
+        dev_err(aw22xxx->dev, "%s: aud not support!", __func__);
+        return ret;
+    }
+
+	ret = kstrtou32(buf, 0, &databuf[0]);
+	if (ret < 0) {
+		dev_err(aw22xxx->dev, "%s: input data invalid!", __func__);
+		return ret;
+	}
+	if (databuf[0] > 1){
+        databuf[0] = 1;
+	}
+
+    aw22xxx_agc_enable(aw22xxx,databuf[0]);
+
+    return len;
+}
+
+static ssize_t
+aw22xxx_agcigain_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
+{
+	unsigned int databuf[1] = { 0 };
+    unsigned char igain = 0;
+	int ret = -1;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+
+    if(g_aud_en < 1){
+        dev_err(aw22xxx->dev, "%s: aud not support!", __func__);
+        return ret;
+    }
+
+	ret = kstrtou32(buf, 0, &databuf[0]);
+	if (ret < 0) {
+		dev_err(aw22xxx->dev, "%s: input data invalid!", __func__);
+		return ret;
+	}
+
+    igain = databuf[0] & 0x001f;
+
+    aw22xxx_agc_igain_cfg(aw22xxx,igain);
+
+    return len;
+}
 */
 
 static int aw22xxx_dbgctr_cfg(struct aw22xxx *aw22xxx, unsigned char cfg)
@@ -944,7 +1096,7 @@ static void aw22xxx_cfg_loaded(const struct firmware *cont, void *context)
             /* gcr chip enable delay */
             if((reg_addr == REG_GCR) &&
                     ((reg_val&BIT_GCR_CHIPEN_ENABLE) == BIT_GCR_CHIPEN_ENABLE)) {
-                msleep(2);
+                usleep_range(2000, 2500);
             }
         }
     }
@@ -956,10 +1108,75 @@ static void aw22xxx_cfg_loaded(const struct firmware *cont, void *context)
 //add by nubia zhouruituan end
     pr_info("%s: cfg update complete\n", __func__);
 }
+
+static void aw22xxx_cfg_recover_loaded(const struct firmware *cont, void *context)
+{
+    struct aw22xxx *aw22xxx = context;
+    int i = 0;
+    unsigned char page = 0;
+    unsigned char reg_addr = 0;
+    unsigned char reg_val = 0;
+
+    pr_info("%s: enter\n", __func__);
+
+    if (!cont) {
+        pr_err("%s: failed to read %s\n", __func__, aw22xxx_cfg_name[aw22xxx->effect]);
+        release_firmware(cont);
+        return;
+    }
+
+    pr_info("%s: loaded %s - size: %zu\n", __func__, aw22xxx_cfg_name[aw22xxx->effect],
+                    cont ? cont->size : 0);
+/*
+    for(i=0; i<cont->size; i++) {
+        pr_info("%s: addr:0x%04x, data:0x%02x\n", __func__, i, *(cont->data+i));
+    }
+*/
+    for(i=0; i<cont->size; i+=2) {
+        if(*(cont->data+i) == 0xff) {
+            page = *(cont->data+i+1);
+        }
+        if(aw22xxx->cfg == 1) {
+            aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+            pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+        } else {
+            if(page == AW22XXX_REG_PAGE1) {
+                reg_addr = *(cont->data+i);
+                if((reg_addr<0x2b) && (reg_addr>0x0f)) {
+                    reg_addr -= 0x10;
+                    reg_val = (unsigned char)(((aw22xxx->rgb[reg_addr/3])>>(8*(2-reg_addr%3)))&0xff);
+                    aw22xxx_i2c_write(aw22xxx, *(cont->data+i), reg_val);
+                    pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), reg_val);
+                } else {
+                    aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+                    pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+                }
+            } else {
+                aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+                pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+            }
+        }
+        if(page == AW22XXX_REG_PAGE0) {
+            reg_addr = *(cont->data+i);
+            reg_val = *(cont->data+i+1);
+            /* gcr chip enable delay */
+            if((reg_addr == REG_GCR) &&
+                    ((reg_val&BIT_GCR_CHIPEN_ENABLE) == BIT_GCR_CHIPEN_ENABLE)) {
+                usleep_range(2000, 2500);
+            }
+        }
+    }
+
+    release_firmware(cont);
+//add by nubia zhouruituan start
+    	//aw22xxx_led_imax_cfg(aw22xxx);
+    aw22xxx_imax_cfg(aw22xxx,aw22xxx_imax_code[8]);
+//add by nubia zhouruituan end
+    pr_info("%s: cfg update complete\n", __func__);
+}
+
 static bool aw22xxx_is_need_init(struct aw22xxx *aw22xxx)
 {
-    static bool init_flg = false;
-
     if(aw22xxx->effect!=2){
          aw22xxx->fan_led_stat = true;
     }
@@ -967,8 +1184,8 @@ static bool aw22xxx_is_need_init(struct aw22xxx *aw22xxx)
         aw22xxx->fan_led_stat = false;
     }
  
-    if(init_flg == false){
-        init_flg = true;
+    if(g_init_flg == false){
+        g_init_flg = true;
         return true;
     }
     if(aw22xxx->effect == 3){
@@ -1012,6 +1229,7 @@ static int aw22xxx_cfg_update_wait(struct aw22xxx *aw22xxx)
     const struct firmware *firmware = NULL;
     int ret = 0;
     pr_info("%s: enter\n", __func__);
+
     if(aw22xxx->effect < (sizeof(aw22xxx_cfg_name)/AW22XXX_CFG_NAME_MAX)) {
         pr_info("%s: cfg name=%s\n", __func__, aw22xxx_cfg_name[aw22xxx->effect]);
     } else {
@@ -1042,6 +1260,142 @@ static int aw22xxx_cfg_update_wait(struct aw22xxx *aw22xxx)
 
     return ret;
 }
+
+static int aw22xxx_cfg_recover_update_wait(struct aw22xxx *aw22xxx)
+{
+    const struct firmware *firmware = NULL;
+    int ret = 0;
+    pr_info("%s: enter\n", __func__);
+
+    //lamp_effect
+	if (aw22xxx->effect >= 4 && aw22xxx->effect <= 5)
+	{
+		lamp_effect = aw22xxx->effect;
+	}
+	pr_info("%s: lamp_effect =%x\n", __func__, lamp_effect);
+	
+	//fan_effect
+	if(aw22xxx->effect >= 2 && aw22xxx->effect <= 3)
+	{
+		fan_effect = aw22xxx->effect;
+	}
+	pr_info("%s: fan_effect =%x\n", __func__, fan_effect);
+
+    if(aw22xxx->effect < (sizeof(aw22xxx_cfg_name)/AW22XXX_CFG_NAME_MAX)) {
+        pr_info("%s: cfg name=%s\n", __func__, aw22xxx_cfg_name[aw22xxx->effect]);
+    } else {
+        pr_err("%s: effect 0x%02x over max value \n", __func__, aw22xxx->effect);
+        return -1;
+    }
+#define EFFECT_NAME_MIN_LEN  5
+    if(strlen(aw22xxx_cfg_name[aw22xxx->effect]) < EFFECT_NAME_MIN_LEN){
+        pr_err("%s: effect 0x%02x name is NULL, stop to load it!\n", __func__, aw22xxx->effect);
+        return -1;
+    }
+
+    if(aw22xxx->fw_flags != AW22XXX_FLAG_FW_OK) {
+        pr_err("%s: fw update error: not compelte \n", __func__);
+        return -2;
+    }
+    if(aw22xxx_is_need_init(aw22xxx))
+        aw22xxx_init_cfg_update_array(aw22xxx);
+    ret = request_firmware(&firmware, aw22xxx_cfg_name[aw22xxx->effect], aw22xxx->dev);
+    if(ret != 0){
+        pr_err("%s: firmware request fail!\n", __func__);
+        return ret;
+    }
+
+    aw22xxx_cfg_recover_loaded(firmware, aw22xxx);
+    aw22xxx->task_irq += 1;
+    AW22_LOG("aw22xxx->task_irq = %d\n", aw22xxx->task_irq);
+
+    msleep(20);	//wait for bin exec
+
+    return ret;
+}
+
+#if 0
+static void aw22xxx_recover_loaded(const struct firmware *cont, void *context)
+{
+	struct aw22xxx *aw22xxx = context;
+	int i = 0;
+	unsigned char page = 0;
+	unsigned char reg_addr = 0;
+	unsigned char reg_val = 0;
+	
+	if (!cont) {
+		pr_err("%s: failed to read %s\n", __func__, aw22xxx_cfg_name[aw22xxx->effect]);
+		release_firmware(cont);
+		return;
+	}
+
+	pr_info("%s(%d): loaded %s - size: %zu\n", __func__, __LINE__,aw22xxx_cfg_name[aw22xxx->effect],
+					cont ? cont->size : 0);
+
+	for (i = 0; i < cont->size; i += 2) {
+		if (*(cont->data+i) == 0xff)
+			page = *(cont->data+i+1);
+		aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+		pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+		/*
+		if (aw22xxx->cfg == 1) {
+			aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+			pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+		} else {
+			if (page == AW22XXX_REG_PAGE1) {
+				reg_addr = *(cont->data+i);
+				if ((reg_addr < 0x2b) && (reg_addr > 0x0f)) {
+					reg_addr -= 0x10;
+					reg_val = (unsigned char)(((aw22xxx->rgb[reg_addr / 3]) >> (8 * (2 - reg_addr % 3))) & 0xff);
+					aw22xxx_i2c_write(aw22xxx, *(cont->data+i), reg_val);
+					pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), reg_val);
+				} else {
+					aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+					pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+				}
+			} else {
+				aw22xxx_i2c_write(aw22xxx, *(cont->data+i), *(cont->data+i+1));
+				pr_debug("%s: addr:0x%02x, data:0x%02x\n", __func__, *(cont->data+i), *(cont->data+i+1));
+			}
+		}
+		*/
+		if (page == AW22XXX_REG_PAGE0) {
+			reg_addr = *(cont->data+i);
+			reg_val = *(cont->data+i+1);
+			/* gcr chip enable delay */
+			if ((reg_addr == REG_GCR) &&
+					((reg_val&BIT_GCR_CHIPEN_ENABLE) == BIT_GCR_CHIPEN_ENABLE)) {
+				usleep_range(2000, 3000);
+			}
+		}
+	}
+
+	release_firmware(cont);
+
+	pr_info("%s: cfg update complete\n", __func__);
+	mutex_unlock(&aw22xxx->cfg_lock);
+}
+
+static int aw22xxx_recover_cfg(struct aw22xxx *aw22xxx)
+{
+	if (aw22xxx->effect < (sizeof(aw22xxx_cfg_name)/AW22XXX_CFG_NAME_MAX)) {
+		pr_info("%s: cfg name=%s\n", __func__, aw22xxx_cfg_name[aw22xxx->effect]);
+	} else {
+		pr_err("%s: effect 0x%02x over max value\n", __func__, aw22xxx->effect);
+		aw22xxx->effect = (sizeof(aw22xxx_cfg_name)/AW22XXX_CFG_NAME_MAX) - 1;//sunyu
+	}
+
+	if (aw22xxx->fw_flags != AW22XXX_FLAG_FW_OK)
+		return -2;
+
+	mutex_lock(&aw22xxx->cfg_lock);
+
+	return request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
+				aw22xxx_cfg_name[aw22xxx->effect], aw22xxx->dev, GFP_KERNEL,
+				aw22xxx, aw22xxx_recover_loaded);
+}
+#endif
+
 static int aw22xxx_container_update(struct aw22xxx *aw22xxx,
         struct aw22xxx_container *aw22xxx_fw)
 {
@@ -1070,25 +1424,29 @@ static int aw22xxx_container_update(struct aw22xxx *aw22xxx,
     aw22xxx_i2c_write(aw22xxx, 0x20, 0x03);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x03);
     aw22xxx_i2c_write(aw22xxx, 0x23, 0x00);
-    msleep(40);
+    if(g_ver_var > AW_DRV_VER11){
+      usleep_range(4000, 4500);
+    }else{
+      msleep(40);
+    }
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x22, 0x40);
     aw22xxx_i2c_write(aw22xxx, 0x21, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x02);
     aw22xxx_i2c_write(aw22xxx, 0x23, 0x00);
-    msleep(6);
+    usleep_range(6000, 6500);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x22, 0x42);
     aw22xxx_i2c_write(aw22xxx, 0x21, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x02);
     aw22xxx_i2c_write(aw22xxx, 0x23, 0x00);
-    msleep(6);
+    usleep_range(6000, 6500);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x22, 0x44);
     aw22xxx_i2c_write(aw22xxx, 0x21, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x02);
     aw22xxx_i2c_write(aw22xxx, 0x23, 0x00);
-    msleep(6);
+    usleep_range(6000, 6500);
     aw22xxx_i2c_write(aw22xxx, 0x30, 0x00);
     aw22xxx_i2c_write(aw22xxx, 0x20, 0x00);
 
@@ -1130,7 +1488,7 @@ static int aw22xxx_container_update(struct aw22xxx *aw22xxx,
     aw22xxx_i2c_write(aw22xxx, 0x22, (((aw22xxx_fw->len-1)>>8)&0xff));
     aw22xxx_i2c_write(aw22xxx, 0x21, (((aw22xxx_fw->len-1)>>0)&0xff));
     aw22xxx_i2c_write(aw22xxx, 0x24, 0x07);
-    msleep(5);
+    usleep_range(5000, 6500);
     aw22xxx_i2c_read(aw22xxx, 0x24, &reg_val);
     if(reg_val == 0x05) {
         aw22xxx_i2c_read(aw22xxx, 0x25, &reg_val);
@@ -1247,7 +1605,7 @@ static void aw22xxx_fw_loaded(const struct firmware *cont, void *context)
     aw22xxx_i2c_write(aw22xxx, 0x22, (((aw22xxx_fw->len-1)>>8)&0xff));
     aw22xxx_i2c_write(aw22xxx, 0x21, (((aw22xxx_fw->len-1)>>0)&0xff));
     aw22xxx_i2c_write(aw22xxx, 0x24, 0x07);
-    msleep(5);
+    usleep_range(5000, 6500);
     aw22xxx_i2c_read(aw22xxx, 0x24, &reg_val);
     if(reg_val == 0x05) {
         aw22xxx_i2c_read(aw22xxx, 0x25, &reg_val);
@@ -1338,13 +1696,38 @@ static void aw22xxx_cfg_work_routine(struct work_struct *work)
 
 }
 
+static void aw22xxx_recover_work_routine(struct work_struct *work)
+{
+	struct aw22xxx *aw22xxx = container_of(work, struct aw22xxx, recover_work);
+	pr_info("%s: functions compelte!\n", __func__);
+	aw22xxx_reg_page_cfg(aw22xxx, AW22XXX_REG_PAGE0);
+	aw22xxx_mcu_reset(aw22xxx, true);
+	aw22xxx_mcu_enable(aw22xxx, false);
+	aw22xxx_chip_enable(aw22xxx, false);
+	pr_info("%s: enter standby mode!\n", __func__);
+	aw22xxx_reg_page_cfg(aw22xxx, AW22XXX_REG_PAGE0);
+	aw22xxx_i2c_write(aw22xxx, 0x02, 0x01);
+	aw22xxx_i2c_write(aw22xxx, 0x0C, 0x00);
+	aw22xxx_i2c_write(aw22xxx, 0x05, 0x01);
+	aw22xxx_i2c_write(aw22xxx, 0x04, 0x01);
+	aw22xxx_i2c_write(aw22xxx, 0x09, 0x11);
+	aw22xxx_i2c_write(aw22xxx, 0x04, 0x03);
+	aw22xxx_i2c_write(aw22xxx, 0x05, 0x41);
+	msleep(200);
+	pr_info("%s: lamp_init compelte !\n", __func__);
+	aw22xxx->effect = lamp_effect;
+	aw22xxx_cfg_recover_update_wait(aw22xxx);
+	msleep(200);
+	aw22xxx->effect = fan_effect;
+	aw22xxx_cfg_recover_update_wait(aw22xxx);
+}
+
 static int aw22xxx_load_nubia_fw_name(struct aw22xxx *aw22xxx)
 {
     unsigned int gpio_value = 0;
 
     memset(aw22xxx_fw_name, 0, AW22XXX_CFG_NAME_MAX);
     strcpy(aw22xxx_fw_name, FW_NAME_DEFAULT);
-
     // judge the fw name only for nx669j-s
 #if 0
     if (gpio_is_valid(aw22xxx->nubia_ver_gpio)) {
@@ -1368,6 +1751,12 @@ static int aw22xxx_fw_init(struct aw22xxx *aw22xxx)
     aw22xxx->fw_timer.function = aw22xxx_fw_timer_func;
     INIT_WORK(&aw22xxx->fw_work, aw22xxx_fw_work_routine);
     INIT_WORK(&aw22xxx->cfg_work, aw22xxx_cfg_work_routine);
+
+    if(g_ver_var == AW_DRV_VER11){
+        INIT_WORK(&aw22xxx->recover_work, aw22xxx_recover_work_routine);
+    }
+
+	pr_info("%s: INIT_WORK compelte!\n", __func__);
     hrtimer_start(&aw22xxx->fw_timer, 
             ktime_set(fw_timer_val/1000, (fw_timer_val%1000)*1000000), 
             HRTIMER_MODE_REL);
@@ -1403,6 +1792,8 @@ static void aw22xxx_interrupt_setup(struct aw22xxx *aw22xxx)
 
     aw22xxx_i2c_write_bits(aw22xxx, REG_INTEN,
             BIT_INTEN_FUNCMPE_MASK, BIT_INTEN_FUNCMPE_ENABLE);
+    aw22xxx_i2c_write_bits(aw22xxx, REG_INTEN,
+			BIT_WATCHDOG_FUNCMPE_MASK, BIT_WATCHDOG_FUNCMPE_ENABLE);
 }
 
 static irqreturn_t aw22xxx_irq(int irq, void *data)
@@ -1415,7 +1806,7 @@ static irqreturn_t aw22xxx_irq(int irq, void *data)
     aw22xxx_i2c_read(aw22xxx, REG_INTST, &reg_val);
     pr_info("%s: reg INTST=0x%x\n", __func__, reg_val);
 
-    if(reg_val & BIT_INTST_FUNCMPE) {
+    /*if(reg_val & BIT_INTST_FUNCMPE) {
         pr_info("%s: functions compelte!\n", __func__);
 		if(kthread_status == 0 ){
 			funcmp_flag = 0;
@@ -1427,11 +1818,50 @@ static irqreturn_t aw22xxx_irq(int irq, void *data)
 			funcmp_flag = 1;
 		}
         pr_info("%s: enter standby mode!\n", __func__);
-    }
+    }*/
+    if(reg_val & BIT_WATCHDOG_FUNCMPE){
+		schedule_work(&aw22xxx->recover_work);
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+        AW22_LOG("LED WATCHDOG recover cfg warnning,count:%d\n", aw22xxx->task_irq);
+		zlog_client_record(aw22xxx->zlog_aw22xxx_client, "LED WATCHDOG recover cfg warnning,count:%d\n", aw22xxx->task_irq);
+		zlog_client_notify(aw22xxx->zlog_aw22xxx_client,  ZLOG_LED_WATCHDOG_WARN_NO);
+#endif
+	}
     pr_info("%s exit\n", __func__);
 
     return IRQ_HANDLED;
 }
+
+/* Started by AICoder, pid:i4a67i246ew96af14e090ba7e015e4278008a5d1 */
+static irqreturn_t aw22xxx_irq_v15(int irq, void *data)
+{
+    struct aw22xxx *aw22xxx = data;
+    unsigned char reg_val = 0x00;
+
+    aw22xxx_i2c_read(aw22xxx, REG_INTST, &reg_val);
+    pr_info("%s: reg INTST=0x%x\n", __func__, reg_val);
+
+    if (reg_val & BIT_INTST_FUNCMPE) {
+        pr_info("%s: functions complete!\n", __func__);
+        aw22xxx_reg_page_cfg(aw22xxx, AW22XXX_REG_PAGE0);
+        aw22xxx_mcu_reset(aw22xxx, true);
+        aw22xxx_mcu_enable(aw22xxx, false);
+        aw22xxx_chip_enable(aw22xxx, false);
+        pr_info("%s: enter standby mode!\n", __func__);
+    }
+    if (reg_val & BIT_INTST_WTD) {
+        pr_info("%s: watchdog interrupt received!\n", __func__);
+        aw22xxx_reg_page_cfg(aw22xxx, AW22XXX_REG_PAGE0);
+        aw22xxx_mcu_reset(aw22xxx, true);
+        aw22xxx_mcu_reset(aw22xxx, false);
+        aw22xxx_mcu_enable(aw22xxx, true);
+        if (aw22xxx->effect)
+            schedule_work(&aw22xxx->cfg_work);
+    }
+
+    return IRQ_HANDLED;
+}
+/* Ended by AICoder, pid:i4a67i246ew96af14e090ba7e015e4278008a5d1 */
 
 #ifdef NUBIA_MULTICOLOR_LED
 static int aw22xxx_pinctrl_init(struct device *dev,
@@ -1462,45 +1892,106 @@ static int aw22xxx_pinctrl_init(struct device *dev,
 	return 0;
 }
 
-static int aw22xxx_pinctrl_set_state(
-		struct aw22xxx *aw22xxx_data,
-		bool active)
+/* Started by AICoder, pid:737cev175b3314014ea10927a061cb116807a9f4 */
+static int aw22xxx_pinctrl_set_state(struct aw22xxx *aw22xxx_data, bool active)
 {
-	int ret = -1;
+    int ret = -1;
+    if (!aw22xxx_data->pinctrl_info.pinctrl ||
+        !aw22xxx_data->pinctrl_info.pin_active ||
+        !aw22xxx_data->pinctrl_info.pin_suspend) {
+        pr_err("%s: pinctrl is invalid, skip.\n", __func__);
+        return -EINVAL;
+    }
 
-	if (!aw22xxx_data->pinctrl_info.pinctrl ||
-			!aw22xxx_data->pinctrl_info.pin_active ||
-			!aw22xxx_data->pinctrl_info.pin_suspend) {
-		pr_err("%s: pinctrl is invalid, skip.\n",__func__);
-		return ret;
-	}
-	if (active) {
-		ret = pinctrl_select_state(aw22xxx_data->pinctrl_info.pinctrl,
-				aw22xxx_data->pinctrl_info.pin_active);
-	} else {
-		ret = pinctrl_select_state(aw22xxx_data->pinctrl_info.pinctrl,
-				aw22xxx_data->pinctrl_info.pin_suspend);
-	}
-	pr_debug("%s: set pinctrl to [%s], ret = %d.\n", __func__,
-			active ? "active" : "suspend", ret);
+    ret = pinctrl_select_state(aw22xxx_data->pinctrl_info.pinctrl,
+        active ? aw22xxx_data->pinctrl_info.pin_active : aw22xxx_data->pinctrl_info.pin_suspend);
 
-	return ret;
+    pr_debug("%s: set pinctrl to [%s], ret = %d.\n", __func__,
+        active ? "active" : "suspend", ret);
+
+    return ret;
 }
+/* Ended by AICoder, pid:737cev175b3314014ea10927a061cb116807a9f4 */
 #endif
 
+/* Started by AICoder, pid:b0d80a8778k782014a960bba60b4185a7b623e27 */
+void aw22xxx_set_cfg_name(int mode, int count) {
+    int i;
+
+    if ((mode >= CFG_MODE_MAX) || (mode < 0))
+        return;
+
+    for (i = 0; i < count; i++) {
+        sprintf(aw22xxx_cfg_name[cfg_mode_addr[mode] + i], "aw_cfg%d_%x.bin", mode, i + 1);
+    }
+}
+
+void aw22xxx_set_fan_name(int mode, int count) {
+    int i;
+
+    if ((mode >= FAN_MODE_MAX) || (mode < 0))
+        return;
+
+    for (i = 0; i < count; i++) {
+        sprintf(aw22xxx_cfg_name[fan_mode_addr[mode] + i], "aw_fan%d_%x.bin", mode, i + 1);
+    }
+}
+
+void aw22xxx_init_leds_name(struct device_node *np) {
+    int i, ret;
+    u32 *buf;
+
+    for (i = CFG_BASE_MAX; i < AW22XXX_CFG_NUM_MAX; i++) {
+        strcpy(aw22xxx_cfg_name[i], "null");
+    }
+
+	AW22_LOG("load CFG_MODE_MAX: %d\n", CFG_MODE_MAX);
+    buf = kcalloc(CFG_MODE_MAX, sizeof(*buf), GFP_KERNEL);
+    if (!buf) return;
+
+    ret = of_property_read_u32_array(np, "cfg_modex_count", buf, CFG_MODE_MAX);
+    if (!ret) {
+        for (i = 0; i < CFG_MODE_MAX; i++) {
+            aw22xxx_set_cfg_name(i, buf[i]);
+        }
+    }
+    kfree(buf);
+
+	AW22_LOG("FAN_MODE_MAX: %d\n", FAN_MODE_MAX);
+    buf = kcalloc(FAN_MODE_MAX, sizeof(*buf), GFP_KERNEL);
+    if (!buf) return;
+
+    ret = of_property_read_u32_array(np, "fan_modex_count", buf, FAN_MODE_MAX);
+    if (!ret) {
+        for (i = 0; i < FAN_MODE_MAX; i++) {
+            aw22xxx_set_fan_name(i, buf[i]);
+        }
+    }
+    kfree(buf);
+}
+/* Ended by AICoder, pid:b0d80a8778k782014a960bba60b4185a7b623e27 */
 /*****************************************************
  *
  * device tree
  *
  *****************************************************/
+/* Started by AICoder, pid:da421j958end527146cb0bb52008d1698e45f2be */
 static int aw22xxx_parse_dt(struct device *dev, struct aw22xxx *aw22xxx,
         struct device_node *np)
 {
     int ret = 0;
+    int i;
+    u32 *buf;
+
+    if (of_property_read_u32(np, "aw_drv_ver",&g_ver_var)){
+        g_ver_var = AW_DRV_VER11;
+    }
+    dev_info(dev, "%s: aw drv ver=%d\n", __func__, g_ver_var);
+
     aw22xxx->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
     if (aw22xxx->reset_gpio < 0) {
         dev_err(dev, "%s: no reset gpio provided, will not HW reset device\n", __func__);
-        return -1;
+        return -EINVAL;
     } else {
         ret = gpio_direction_output(aw22xxx->reset_gpio, 1);
         if (!ret) {
@@ -1508,10 +1999,11 @@ static int aw22xxx_parse_dt(struct device *dev, struct aw22xxx *aw22xxx,
         }
         dev_info(dev, "%s: reset gpio provided ok, aw22xxx->reset_gpio=%d\n", __func__, aw22xxx->reset_gpio);
     }
+
     aw22xxx->irq_gpio = of_get_named_gpio(np, "irq-gpio", 0);
     if (aw22xxx->irq_gpio < 0) {
-        dev_err(dev, "%s: no irq gpio provided, will not suppport intterupt\n", __func__);
-        return -1;
+        dev_err(dev, "%s: no irq gpio provided, will not suppport intterrupt\n", __func__);
+        return -EINVAL;
     } else {
         dev_info(dev, "%s: irq gpio provided ok, aw22xxx->irq_gpio=%d\n", __func__, aw22xxx->irq_gpio);
     }
@@ -1522,8 +2014,34 @@ static int aw22xxx_parse_dt(struct device *dev, struct aw22xxx *aw22xxx,
     } else {
         dev_info(dev, "%s: nubia_ver_gpio provided ok, aw22xxx->nubia_ver_gpio=%d\n", __func__, aw22xxx->nubia_ver_gpio);
     }
+
+    if (of_property_read_u32(np, "cfg_custom_en",&g_custom_en)){
+        g_custom_en = 0;
+        return 0;
+    }
+
+    if(g_custom_en < 1) return 0;
+
+    AW22_LOG("load cfg_custom_en=%d,CFG_BASE_MAX: %d\n", g_custom_en,CFG_BASE_MAX);
+    buf = kcalloc(CFG_BASE_MAX, sizeof(*buf), GFP_KERNEL);
+    if (!buf) return -ENOMEM;
+
+    ret = of_property_read_u32_array(np, "cfg_base_en", buf, CFG_BASE_MAX);
+    if (ret < 0) {
+        kfree(buf);
+        return ret;
+    }
+
+    for(i =0; i < CFG_BASE_MAX; i++){
+        if(0 == buf[i]){
+            strcpy(aw22xxx_cfg_name[i], "null");
+        }
+    }
+
+    kfree(buf);
     return 0;
 }
+/* Ended by AICoder, pid:da421j958end527146cb0bb52008d1698e45f2be */
 
 static int aw22xxx_hw_reset(struct aw22xxx *aw22xxx)
 {
@@ -1531,9 +2049,9 @@ static int aw22xxx_hw_reset(struct aw22xxx *aw22xxx)
 
     if (aw22xxx && gpio_is_valid(aw22xxx->reset_gpio)) {
         gpio_set_value_cansleep(aw22xxx->reset_gpio, 0);
-        msleep(1);
+        usleep_range(1000, 1500);
         gpio_set_value_cansleep(aw22xxx->reset_gpio, 1);
-        msleep(1);
+        usleep_range(1000, 1500);
     } else {
         dev_err(aw22xxx->dev, "%s:  failed\n", __func__);
     }
@@ -1546,7 +2064,7 @@ static int aw22xxx_hw_off(struct aw22xxx *aw22xxx)
 
     if (aw22xxx && gpio_is_valid(aw22xxx->reset_gpio)) {
         gpio_set_value_cansleep(aw22xxx->reset_gpio, 0);
-        msleep(1);
+        usleep_range(1000, 1500);
     } else {
         dev_err(aw22xxx->dev, "%s:  failed\n", __func__);
     }
@@ -1558,6 +2076,7 @@ static int aw22xxx_hw_off(struct aw22xxx *aw22xxx)
  * check chip id
  *
  *****************************************************/
+/* Started by AICoder, pid:f2598b835cs2bb81450e093530567247fe09b140 */
 static int aw22xxx_read_chipid(struct aw22xxx *aw22xxx)
 {
     int ret = -1;
@@ -1583,16 +2102,17 @@ static int aw22xxx_read_chipid(struct aw22xxx *aw22xxx)
                 switch(reg_val) {
                     case AW22118_CHIPID:
                         aw22xxx->chipid= AW22118;
-                        pr_info("%s: chipid: aw22118\n", __func__);
+                        strcpy(g_chip_id,"aw22118");
                         break;
                     case AW22127_CHIPID:
                         aw22xxx->chipid= AW22127;
-                        pr_info("%s: chipid: aw22127\n", __func__);
+                        strcpy(g_chip_id,"aw22117");
                         break;
                     default:
                         pr_err("%s: unknown id=0x%02x\n", __func__, reg_val);
-                        break;
+                        return -EINVAL;
                 }
+                pr_info("%s: chipid: %s\n", __func__, g_chip_id);
                 return 0;
             default:
                 pr_info("%s unsupported device revision (0x%x)\n",
@@ -1606,24 +2126,99 @@ static int aw22xxx_read_chipid(struct aw22xxx *aw22xxx)
 
     return -EINVAL;
 }
+/* Ended by AICoder, pid:f2598b835cs2bb81450e093530567247fe09b140 */
+/******************************************************
+ * old prj effect code,check is fan or lamp
+ ******************************************************/
+static void aw22xxx_set_cfg_run_state_for_old(int effect){
+    int tmp_id = 0;
 
+    //lamp off
+    if(0 == effect){
+        g_cfg_cur_state &= (~BIT_LAMP_ENABLE);
+        return;
+    }
+    //fan off
+    if(2 == effect){
+        g_cfg_cur_state &= (~BIT_FAN_ENABLE);
+        return;
+    }
+    //fan on
+    if(1 == effect){
+        g_cfg_cur_state |= BIT_FAN_ENABLE;
+        return;
+    }
+    //fan and lamp check
+    tmp_id = effect >> 4; //div 16
+	switch(tmp_id){
+        case 2:
+        case 3:
+        case 4:
+        case 9:
+        case 10:
+           g_cfg_cur_state |= BIT_FAN_ENABLE;
+           break;
+        default:
+           g_cfg_cur_state |= BIT_LAMP_ENABLE;
+           break;
+    }
+}
+/******************************************************
+ * uinicode effect,check is fan or lamp
+ ******************************************************/
+static void aw22xxx_set_cfg_run_state(int effect){
+    int tmp_id = 0;
 
+    //lamp off
+    if(0 == effect){
+        g_cfg_cur_state &= (~BIT_LAMP_ENABLE);
+        return;
+    }
+    //fan off
+    if(2 == effect){
+        g_cfg_cur_state &= (~BIT_FAN_ENABLE);
+        return;
+    }
+    //fan on
+    if(1 == effect){
+        g_cfg_cur_state |= BIT_FAN_ENABLE;
+        return;
+    }
+    //fan and lamp check
+    tmp_id = effect >> 4; //div 16
+	switch(tmp_id){
+        case 2:
+        case 3:
+        case 4:
+        case 16:
+        case 17:
+           g_cfg_cur_state |= BIT_FAN_ENABLE;
+           break;
+        default:
+           g_cfg_cur_state |= BIT_LAMP_ENABLE;
+           break;
+    }
+}
 /******************************************************
  *
  * sys group attribute: reg
  *
  ******************************************************/
+/* Started by AICoder, pid:93bbeh44236bcd01460b099770a576498ac39331 */
 static ssize_t aw22xxx_reg_store(struct device *dev, struct device_attribute *attr,
                 const char *buf, size_t count)
 {
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    unsigned int databuf[2] = {0, 0};
+    unsigned int databuf[2];
 
-    if(2 == sscanf(buf, "%x %x", &databuf[0], &databuf[1])) {
-        aw22xxx_i2c_write(aw22xxx, databuf[0], databuf[1]);
+    if (sscanf(buf, "%x %x", &databuf[0], &databuf[1]) != 2 || databuf[0] >= AW22XXX_REG_MAX) {
+        AW22_LOG("Invalid input format or out of range\n");
+        return -EINVAL;
     }
+
+    aw22xxx_i2c_write(aw22xxx, databuf[0], databuf[1]);
 
     return count;
 }
@@ -1634,9 +2229,10 @@ static ssize_t aw22xxx_reg_show(struct device *dev, struct device_attribute *att
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
     ssize_t len = 0;
-    unsigned int i = 0;
-    unsigned char reg_val = 0;
-    unsigned char reg_page = 0;
+    unsigned int i;
+    unsigned char reg_val;
+    unsigned char reg_page;
+
     aw22xxx_i2c_read(aw22xxx, REG_PAGE, &reg_page);
     for(i = 0; i < AW22XXX_REG_MAX; i ++) {
         if(!reg_page) {
@@ -1644,25 +2240,34 @@ static ssize_t aw22xxx_reg_show(struct device *dev, struct device_attribute *att
                continue;
         }
         aw22xxx_i2c_read(aw22xxx, i, &reg_val);
-        len += snprintf(buf+len, PAGE_SIZE-len, "reg:0x%02x=0x%02x \n", i, reg_val);
+        if (snprintf(buf+len, PAGE_SIZE-len, "reg:0x%02x=0x%02x \n", i, reg_val) >= PAGE_SIZE-len) {
+            return -EFAULT;
+        }
+        len += strlen(buf+len);
     }
+
     return len;
 }
+/* Ended by AICoder, pid:93bbeh44236bcd01460b099770a576498ac39331 */
 
+/* Started by AICoder, pid:rfab5a75bf6d09314ed308de50c1c63c325035b9 */
 static ssize_t aw22xxx_hwen_store(struct device *dev, struct device_attribute *attr,
                 const char *buf, size_t count)
 {
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    unsigned int databuf[1] = {0};
+    unsigned int databuf;
 
-    if(1 == sscanf(buf, "%x", &databuf[0])) {
-        if(1 == databuf[0]) {
-            aw22xxx_hw_reset(aw22xxx);
-        } else {
-            aw22xxx_hw_off(aw22xxx);
-        }
+    if (sscanf(buf, "%x", &databuf) != 1 || databuf > 1) {
+        AW22_LOG("Invalid input format or out of range\n");
+        return -EINVAL;
+    }
+
+    if(1 == databuf) {
+        aw22xxx_hw_reset(aw22xxx);
+    } else {
+        aw22xxx_hw_off(aw22xxx);
     }
 
     return count;
@@ -1673,65 +2278,50 @@ static ssize_t aw22xxx_hwen_show(struct device *dev, struct device_attribute *at
 {
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
-    ssize_t len = 0;
-    len += snprintf(buf+len, PAGE_SIZE-len, "hwen=%d\n",
-            gpio_get_value(aw22xxx->reset_gpio));
 
-    return len;
+    return snprintf(buf, PAGE_SIZE, "hwen=%d\n", gpio_get_value(aw22xxx->reset_gpio));
 }
-
-static ssize_t aw22xxx_fw_store(struct device *dev, struct device_attribute *attr,
-                const char *buf, size_t count)
+/* Ended by AICoder, pid:rfab5a75bf6d09314ed308de50c1c63c325035b9 */
+/* Started by AICoder, pid:78c5207af3tc87214ee50ac0907407201c11f0c1 */
+static ssize_t aw22xxx_fw_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+    unsigned int databuf = 0;
 
-    unsigned int databuf[1] = {0};
-
-    if(1 == sscanf(buf, "%x", &databuf[0])) {
-        aw22xxx->fw_update = databuf[0];
-        if(1 == databuf[0]) {
+    if (sscanf(buf, "%x", &databuf) == 1) {
+        aw22xxx->fw_update = databuf;
+        if (databuf == 1) {
             schedule_work(&aw22xxx->fw_work);
         }
     }
+    g_init_flg = false;
 
     return count;
 }
 
-static ssize_t aw22xxx_fw_show(struct device *dev, struct device_attribute *attr,
-                char *buf)
+static ssize_t aw22xxx_fw_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    ssize_t len = 0;
-
-    len += snprintf(buf+len, PAGE_SIZE-len, "firmware name = %s\n", aw22xxx_fw_name);
-
-    return len;
+    return snprintf(buf, PAGE_SIZE, "firmware name = %s\n", aw22xxx_fw_name);
 }
-
+/* Ended by AICoder, pid:78c5207af3tc87214ee50ac0907407201c11f0c1 */
+/* Started by AICoder, pid:7c0bc62976ne34c1494409fa2044c65de846fd9f */
 static ssize_t aw22xxx_cfg_store(struct device *dev, struct device_attribute *attr,
                 const char *buf, size_t count)
 {
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+    unsigned int databuf;
 
-    unsigned int databuf[1] = {0};
-    unsigned char non_block = 0;
-
-    mutex_lock(&aw22xxx->cfg_lock);
-    if(1 == sscanf(buf, "%x", &databuf[0])) {
-        AW22_LOG("cfg=%02x\n", databuf[0]);
-        aw22xxx->cfg = databuf[0] & 0x0f;
-        non_block = databuf[0] & 0xf0;
-        if(aw22xxx->cfg) {
-            if(non_block)
-                schedule_work(&aw22xxx->cfg_work);
-            else
-                aw22xxx_cfg_update_wait(aw22xxx);
-        }
+    if (sscanf(buf, "%u", &databuf) != 1) {
+        AW22_LOG("Invalid input data\n");
+        return -EINVAL;
     }
-    if(aw22xxx->effect == 0)	//wait for close finish
-        msleep(100);
-    mutex_unlock(&aw22xxx->cfg_lock);
+
+    aw22xxx->cfg = databuf & 0x0f;
+
+    AW22_LOG("cfg=%x\n", aw22xxx->cfg);
+
     return count;
 }
 
@@ -1744,58 +2334,135 @@ static ssize_t aw22xxx_cfg_show(struct device *dev, struct device_attribute *att
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
     for(i=0; i<sizeof(aw22xxx_cfg_name)/AW22XXX_CFG_NAME_MAX; i++) {
-		if(!strcmp(aw22xxx_cfg_name[i], "null"))
-			continue;
-        len += snprintf(buf+len, PAGE_SIZE-len, "cfg[%x] = %s\n", i, aw22xxx_cfg_name[i]);
+        if(!strcmp(aw22xxx_cfg_name[i], "null"))
+            continue;
+        if (snprintf(buf+len, PAGE_SIZE-len, "cfg[%x] = %s\n", i, aw22xxx_cfg_name[i]) >= PAGE_SIZE-len) {
+            return -EFAULT;
+        }
+        len += strlen(buf+len);
     }
-    len += snprintf(buf+len, PAGE_SIZE-len, "current cfg = %s\n", aw22xxx_cfg_name[aw22xxx->effect]);
+
+    if (snprintf(buf+len, PAGE_SIZE-len, "current cfg = %s\n", aw22xxx_cfg_name[aw22xxx->effect]) >= PAGE_SIZE-len) {
+        return -EFAULT;
+    }
+    len += strlen(buf+len);
 
     return len;
 }
 
+static void aw22xxx_recover_effect_state(int effect) {
+    int tmp_id = 0;
+
+    // lamp off
+    if (effect == 0) {
+        lamp_effect = effect;
+        return;
+    }
+
+    // fan on or off
+    if (effect == 1 || effect == 2) {
+        fan_effect = effect;
+        return;
+    }
+
+    // fan and lamp check
+    tmp_id = effect >> 4; // div 16
+    switch (tmp_id) {
+        case 2:
+        case 3:
+        case 4:
+        case 16:
+        case 17:
+            fan_effect = effect;
+            break;
+        default:
+            lamp_effect = effect;
+            break;
+    }
+}
+/* Ended by AICoder, pid:7c0bc62976ne34c1494409fa2044c65de846fd9f */
+/* Started by AICoder, pid:xf856b4084ab795144f80bfb7027f62496d438a0 */
 static ssize_t aw22xxx_effect_store(struct device* dev, struct device_attribute *attr,
                 const char* buf, size_t len)
 {
-    unsigned int databuf[1];
+    unsigned int databuf;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+    unsigned char non_block = 0;
+
+    if (sscanf(buf,"%x",&databuf) != 1 || databuf >= AW22XXX_CFG_NUM_MAX) {
+        AW22_LOG("Invalid input format or out of range\n");
+        return -EINVAL;
+    }
 
     mutex_lock(&aw22xxx->cfg_lock);
-    sscanf(buf,"%x",&databuf[0]);
-    aw22xxx->effect = databuf[0];
-    mutex_unlock(&aw22xxx->cfg_lock);
+    if(!strcmp(aw22xxx_cfg_name[databuf], "null")){
+        AW22_LOG("not support effect with=%x\n", databuf);
+    }else{
+        aw22xxx->effect = databuf;
+        AW22_LOG("effect=%x\n", aw22xxx->effect);
+        aw22xxx_recover_effect_state(aw22xxx->effect);
+    }
 
-    AW22_LOG("effect=%x\n", aw22xxx->effect);
+    databuf = 1;
+    non_block = databuf & 0xf0;
+    if (non_block) {
+        schedule_work(&aw22xxx->cfg_work);
+    } else {
+        aw22xxx_cfg_update_wait(aw22xxx);
+    }
+
+    if (aw22xxx->effect == 0) {	     //wait for close finish
+        msleep(100);
+    }
+
+    if (g_custom_en > 0) {
+        aw22xxx_set_cfg_run_state(aw22xxx->effect);
+    } else {
+        aw22xxx_set_cfg_run_state_for_old(aw22xxx->effect);
+    }
+
+    AW22_LOG("g_cfg_cur_state=%d\n", g_cfg_cur_state);
+    if (g_cfg_cur_state < 1) {
+        aw22xxx_chip_enable(aw22xxx, false);
+        g_init_flg = false;
+    }
+
+    mutex_unlock(&aw22xxx->cfg_lock);
 
     return len;
 }
-
-static ssize_t aw22xxx_effect_show(struct device* dev,struct device_attribute *attr, char* buf)
+/* Ended by AICoder, pid:xf856b4084ab795144f80bfb7027f62496d438a0 */
+/* Started by AICoder, pid:ha219occbbkce26145bf0963d058860a0a773f2a */
+static ssize_t aw22xxx_effect_show(struct device* dev, struct device_attribute *attr, char* buf)
 {
-    ssize_t len = 0;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    len += snprintf(buf+len, PAGE_SIZE-len, "effect = 0x%02x\n", aw22xxx->effect);
-
-    return len;
+    return snprintf(buf, PAGE_SIZE, "effect = 0x%02x\n", aw22xxx->effect);
 }
-
+/* Ended by AICoder, pid:ha219occbbkce26145bf0963d058860a0a773f2a */
+/* Started by AICoder, pid:a5a37v219akfd2c14c480a9b80766514d627d9e7 */
 static ssize_t aw22xxx_imax_store(struct device* dev, struct device_attribute *attr,
                 const char* buf, size_t len)
 {
-    unsigned int databuf[1];
+    unsigned int databuf;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    sscanf(buf,"%x",&databuf[0]);
-    aw22xxx->imax = databuf[0];
+    if (sscanf(buf,"%x",&databuf) != 1 || databuf >= ARRAY_SIZE(aw22xxx_imax_code)) {
+        AW22_LOG("Invalid input format or out of range\n");
+        return -EINVAL;
+    }
+
+    aw22xxx->imax = databuf;
     aw22xxx_imax_cfg(aw22xxx, aw22xxx_imax_code[aw22xxx->imax]);
 
     return len;
 }
+/* Ended by AICoder, pid:a5a37v219akfd2c14c480a9b80766514d627d9e7 */
 
-static ssize_t aw22xxx_imax_show(struct device* dev,struct device_attribute *attr, char* buf)
+static ssize_t aw22xxx_imax_show(struct device* dev, struct device_attribute *attr, char* buf)
 {
     ssize_t len = 0;
     unsigned int i;
@@ -1811,20 +2478,28 @@ static ssize_t aw22xxx_imax_show(struct device* dev,struct device_attribute *att
     return len;
 }
 
-static ssize_t aw22xxx_rgb_store(struct device* dev, struct device_attribute *attr,
-                const char* buf, size_t len)
+/* Started by AICoder, pid:la13ex9189b7adb14f0f09fc50967220b1a00b00 */
+static ssize_t aw22xxx_rgb_store(struct device* dev, struct device_attribute *attr, const char* buf, size_t len)
 {
     unsigned int databuf[2];
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    sscanf(buf,"%x %x",&databuf[0], &databuf[1]);
+    if (sscanf(buf, "%x %x", &databuf[0], &databuf[1]) != 2) {
+        return -EINVAL;
+    }
+
+    if (databuf[0] >= ARRAY_SIZE(aw22xxx->rgb)) {
+        return -EINVAL;
+    }
+
     aw22xxx->rgb[databuf[0]] = databuf[1];
 
-	AW22_LOG("rgb=%d\n", aw22xxx->rgb);
+    AW22_LOG("rgb[%d]=%d\n", databuf[0], databuf[1]);
 
     return len;
 }
+/* Ended by AICoder, pid:la13ex9189b7adb14f0f09fc50967220b1a00b00 */
 
 static ssize_t aw22xxx_rgb_show(struct device* dev,struct device_attribute *attr, char* buf)
 {
@@ -1839,55 +2514,89 @@ static ssize_t aw22xxx_rgb_show(struct device* dev,struct device_attribute *attr
     return len;
 }
 
+/* Started by AICoder, pid:b0ba9f81f6v26b61432d091f4071b425ea56940e */
 static ssize_t aw22xxx_task0_store(struct device* dev, struct device_attribute *attr,
                 const char* buf, size_t len)
 {
-    unsigned int databuf[1];
+    unsigned int databuf;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    sscanf(buf,"%x",&databuf[0]);
-    aw22xxx->task0 = databuf[0];
+    if (sscanf(buf,"%x",&databuf) != 1) {
+        AW22_LOG("Invalid input format\n");
+        return -EINVAL;
+    }
+
+    aw22xxx->task0 = databuf;
+    AW22_LOG("aw22xxx->task0=%d\n", aw22xxx->task0);
     schedule_work(&aw22xxx->task_work);
 
     return len;
 }
 
-static ssize_t aw22xxx_task0_show(struct device* dev,struct device_attribute *attr, char* buf)
+static ssize_t aw22xxx_task0_show(struct device* dev, struct device_attribute *attr, char* buf)
 {
-    ssize_t len = 0;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    len += snprintf(buf+len, PAGE_SIZE-len, "task0 = 0x%02x\n", aw22xxx->task0);
-
-    return len;
+    return snprintf(buf, PAGE_SIZE, "task0 = 0x%02x\n", aw22xxx->task0);
 }
+/* Ended by AICoder, pid:b0ba9f81f6v26b61432d091f4071b425ea56940e */
 
+/* Started by AICoder, pid:3771808af9q688c149230979c0fb1420134595b7 */
 static ssize_t aw22xxx_task1_store(struct device* dev, struct device_attribute *attr,
                 const char* buf, size_t len)
 {
-    unsigned int databuf[1];
+    unsigned int databuf;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    sscanf(buf,"%x",&databuf[0]);
-    aw22xxx->task1 = databuf[0];
+    if (sscanf(buf,"%x",&databuf) != 1) {
+        AW22_LOG("Invalid input format\n");
+        return -EINVAL;
+    }
+
+    aw22xxx->task1 = databuf;
+    AW22_LOG("aw22xxx->task1=%d\n", aw22xxx->task1);
 
     return len;
 }
 
-static ssize_t aw22xxx_task1_show(struct device* dev,struct device_attribute *attr, char* buf)
+static ssize_t aw22xxx_task1_show(struct device* dev, struct device_attribute *attr, char* buf)
 {
-    ssize_t len = 0;
     struct led_classdev *led_cdev = dev_get_drvdata(dev);
     struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
 
-    len += snprintf(buf+len, PAGE_SIZE-len, "task1 = 0x%02x\n", aw22xxx->task1);
+    return snprintf(buf, PAGE_SIZE, "task1 = 0x%02x\n", aw22xxx->task1);
+}
+/* Ended by AICoder, pid:3771808af9q688c149230979c0fb1420134595b7 */
+/* Started by AICoder, pid:5930cy070b64b551410e0abdf0763c278145241d */
+static ssize_t aw22xxx_task_irq_store(struct device* dev, struct device_attribute *attr,
+                const char* buf, size_t len)
+{
+    unsigned int databuf;
+    struct led_classdev *led_cdev = dev_get_drvdata(dev);
+    struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+
+    if (sscanf(buf,"%u",&databuf) != 1) {
+        AW22_LOG("Invalid input format\n");
+        return -EINVAL;
+    }
+
+    aw22xxx->task_irq = databuf;
+    AW22_LOG("aw22xxx->task_irq=%u\n", aw22xxx->task_irq);
 
     return len;
 }
 
+static ssize_t aw22xxx_task_irq_show(struct device* dev, struct device_attribute *attr, char* buf)
+{
+    struct led_classdev *led_cdev = dev_get_drvdata(dev);
+    struct aw22xxx *aw22xxx = container_of(led_cdev, struct aw22xxx, cdev);
+
+    return snprintf(buf, PAGE_SIZE, "task_irq = %u\n", aw22xxx->task_irq);
+}
+/* Ended by AICoder, pid:5930cy070b64b551410e0abdf0763c278145241d */
 static DEVICE_ATTR(reg, S_IWUSR | S_IRUGO, aw22xxx_reg_show, aw22xxx_reg_store);
 static DEVICE_ATTR(hwen, S_IWUSR | S_IRUGO, aw22xxx_hwen_show, aw22xxx_hwen_store);
 static DEVICE_ATTR(fw, S_IWUSR | S_IRUGO, aw22xxx_fw_show, aw22xxx_fw_store);
@@ -1897,9 +2606,15 @@ static DEVICE_ATTR(imax, S_IWUSR | S_IRUGO, aw22xxx_imax_show, aw22xxx_imax_stor
 static DEVICE_ATTR(rgb, S_IWUSR | S_IRUGO, aw22xxx_rgb_show, aw22xxx_rgb_store);
 static DEVICE_ATTR(task0, S_IWUSR | S_IRUGO, aw22xxx_task0_show, aw22xxx_task0_store);
 static DEVICE_ATTR(task1, S_IWUSR | S_IRUGO, aw22xxx_task1_show, aw22xxx_task1_store);
+static DEVICE_ATTR(task_irq, S_IWUSR | S_IRUGO, aw22xxx_task_irq_show, aw22xxx_task_irq_store);
 
 static DEVICE_ATTR(para, S_IWUSR | S_IRUGO, aw22xxx_para_show, aw22xxx_para_store);
 static DEVICE_ATTR(pattern, S_IWUSR | S_IRUGO, aw22xxx_multi_breath_pattern_show, aw22xxx_multi_breath_pattern_store);
+
+/*static DEVICE_ATTR(auden, S_IWUSR | S_IRUGO, NULL, aw22xxx_auden_store);
+static DEVICE_ATTR(agcen, S_IWUSR | S_IRUGO, NULL, aw22xxx_agcen_store);
+static DEVICE_ATTR(agcigain, S_IWUSR | S_IRUGO, NULL, aw22xxx_agcigain_store);
+*/
 
 static struct attribute *aw22xxx_attributes[] = {
     &dev_attr_reg.attr,
@@ -1911,8 +2626,14 @@ static struct attribute *aw22xxx_attributes[] = {
     &dev_attr_rgb.attr,
     &dev_attr_task0.attr,
     &dev_attr_task1.attr,
+    &dev_attr_task_irq.attr,
     &dev_attr_para.attr,
     &dev_attr_pattern.attr,
+ /*
+    &dev_attr_auden.attr,
+    &dev_attr_agcen.attr,
+    &dev_attr_agcigain.attr,
+*/
     NULL
 };
 
@@ -2004,6 +2725,39 @@ void aw22xxx_build_leds_name(void)
 	}
 }
 
+/* Started by AICoder, pid:pb3cejb0adpf1d31493608c630186707dd89f512 */
+static ssize_t get_aw22xxx_id(struct file *file, char __user *buffer, size_t count, loff_t *offset)
+{
+    if (*offset != 0) {
+        return 0;
+    }
+
+    AW22_LOG("get_aw22xxx_id=%s\n", g_chip_id);
+    return simple_read_from_buffer(buffer, count, offset, g_chip_id, strlen(g_chip_id));
+}
+/* Ended by AICoder, pid:pb3cejb0adpf1d31493608c630186707dd89f512 */
+static const struct proc_ops proc_ops_awid = {
+	.proc_read = get_aw22xxx_id,
+};
+/* Started by AICoder, pid:11725ac7bcydc77142b90bec80b0621e5e77a514 */
+static void aw22xxx_create_proc_entry(void)
+{
+    struct proc_dir_entry *pump_enable_proc_entry = NULL;
+
+    pump_enable_proc_entry = proc_create(PROC_COLORLEDS_ID, 0444, NULL, &proc_ops_awid);
+    if (pump_enable_proc_entry == NULL) {
+        pr_err("proc_create colorleds_id failed!\n");
+    } else {
+        AW22_LOG("proc_create colorleds_id success!\n");
+    }
+}
+
+static void aw22xxx_proc_deinit(void)
+{
+    remove_proc_entry(PROC_COLORLEDS_ID, NULL);
+    AW22_LOG("remove_proc_entry colorleds_id success!\n");
+}
+/* Ended by AICoder, pid:11725ac7bcydc77142b90bec80b0621e5e77a514 */
 /******************************************************
  *
  * i2c driver
@@ -2015,7 +2769,7 @@ static int aw22xxx_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id 
     struct device_node *np = i2c->dev.of_node;
     int ret;
     int irq_flags;
-    int gpio_request_flags = 0;
+    //int gpio_request_flags = 0;
     AW22_LOG("enter.\n");
 
     if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
@@ -2051,13 +2805,14 @@ static int aw22xxx_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id 
     /* aw22xxx rst & int */
     if (np) {
         ret = aw22xxx_parse_dt(&i2c->dev, aw22xxx, np);
-        if (ret) {
+        if (ret < 0) {
             dev_err(&i2c->dev, "%s: failed to parse device tree node\n", __func__);
             goto err_parse_dt;
         }
     } else {
         aw22xxx->reset_gpio = -1;
         aw22xxx->irq_gpio = -1;
+        goto err_parse_dt;
     }
 
     if (gpio_is_valid(aw22xxx->reset_gpio)) {
@@ -2074,7 +2829,7 @@ static int aw22xxx_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id 
             GPIOF_DIR_IN, "aw22xxx_int");
         if (ret){
             dev_err(&i2c->dev, "%s: int request failed\n", __func__);
-            gpio_request_flags = 1;
+            goto err_gpio_request;
         }
     }
 
@@ -2094,21 +2849,30 @@ static int aw22xxx_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id 
 
     /* aw22xxx irq */
     if (gpio_is_valid(aw22xxx->irq_gpio) &&
-        !(aw22xxx->flags & AW22XXX_FLAG_SKIP_INTERRUPTS) && !gpio_request_flags) {
+        !(aw22xxx->flags & AW22XXX_FLAG_SKIP_INTERRUPTS)) {
         /* register irq handler */
         aw22xxx_interrupt_setup(aw22xxx);
         irq_flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
-        ret = devm_request_threaded_irq(&i2c->dev,
+        if(g_ver_var > AW_DRV_VER11){
+            pr_info("aw22xxx driver version switch %d\n", g_ver_var);
+            ret = devm_request_threaded_irq(&i2c->dev,
+                    gpio_to_irq(aw22xxx->irq_gpio),
+                    NULL, aw22xxx_irq_v15, irq_flags,
+                    "aw22xxx", aw22xxx);
+        }else{
+            ret = devm_request_threaded_irq(&i2c->dev,
                     gpio_to_irq(aw22xxx->irq_gpio),
                     NULL, aw22xxx_irq, irq_flags,
                     "aw22xxx", aw22xxx);
+        }
+
         if (ret != 0) {
             dev_err(&i2c->dev, "%s: failed to request IRQ %d: %d\n",
                     __func__, gpio_to_irq(aw22xxx->irq_gpio), ret);
             goto err_irq;
         }
     } else {
-        dev_info(&i2c->dev, "%s skipping IRQ registration gpio_request_flags = %d\n", __func__,gpio_request_flags);
+        //dev_info(&i2c->dev, "%s skipping IRQ registration gpio_request_flags = %d\n", __func__,gpio_request_flags);
         /* disable feature support if gpio was invalid */
         aw22xxx->flags |= AW22XXX_FLAG_SKIP_INTERRUPTS;
     }
@@ -2124,7 +2888,11 @@ static int aw22xxx_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id 
     aw22xxx_load_nubia_fw_name(aw22xxx);
     aw22xxx_fw_init(aw22xxx);
 
-	aw22xxx_build_leds_name();
+    if(g_custom_en > 0){
+       aw22xxx_init_leds_name(np);
+    }else{
+	   aw22xxx_build_leds_name();
+    }
 
     AW22_LOG("probe completed successfully!\n");
 
@@ -2134,6 +2902,13 @@ static int aw22xxx_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id 
         AW22_LOG("pull down successfully!\n");
     }
 
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+    aw22xxx->zlog_aw22xxx_client = zlog_register_client(&zlog_aw22xxx_dev);
+	if (!aw22xxx->zlog_aw22xxx_client) {
+		AW22_LOG("%s zlog register client zlog_aw22xxx_dev fail\n", __func__);
+	}
+#endif
+    aw22xxx_create_proc_entry();
     return 0;
 
 err_sysfs:
@@ -2165,28 +2940,28 @@ err_led:
 #endif
      return multicolor_led = 0;
 }
-
+/* Started by AICoder, pid:za678b09e0x238814d0608a880159e25d08050fa */
 static void aw22xxx_i2c_remove(struct i2c_client *i2c)
 {
     struct aw22xxx *aw22xxx = i2c_get_clientdata(i2c);
 
     pr_info("%s: enter\n", __func__);
-    sysfs_remove_group(&aw22xxx->cdev.dev->kobj,
-            &aw22xxx_attribute_group);
+    aw22xxx_proc_deinit();
+    sysfs_remove_group(&aw22xxx->cdev.dev->kobj, &aw22xxx_attribute_group);
     led_classdev_unregister(&aw22xxx->cdev);
 
     devm_free_irq(&i2c->dev, gpio_to_irq(aw22xxx->irq_gpio), aw22xxx);
 #ifdef CONFIG_NUBIA_LED_AW22XXX_CTS
-    if (gpio_is_valid(aw22xxx->reset_gpio))
+    if (gpio_is_valid(aw22xxx->reset_gpio)) {
         devm_gpio_free(&i2c->dev, aw22xxx->reset_gpio);
-    if (gpio_is_valid(aw22xxx->irq_gpio))
+    }
+    if (gpio_is_valid(aw22xxx->irq_gpio)) {
         devm_gpio_free(&i2c->dev, aw22xxx->irq_gpio);
+    }
 #endif
     devm_kfree(&i2c->dev, aw22xxx);
-    aw22xxx = NULL; 
-
 }
-
+/* Ended by AICoder, pid:za678b09e0x238814d0608a880159e25d08050fa */
 static const struct i2c_device_id aw22xxx_i2c_id[] = {
     { AW22XXX_I2C_NAME, 0 },
     { }

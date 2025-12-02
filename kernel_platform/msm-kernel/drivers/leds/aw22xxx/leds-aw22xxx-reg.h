@@ -180,6 +180,9 @@ const unsigned char aw22xxx_reg_access[AW22XXX_REG_MAX] = {
 #define BIT_INTEN_FUNCMPE_MASK          (~(1<<0))
 #define BIT_INTEN_FUNCMPE_ENABLE        (1<<0)
 #define BIT_INTEN_FUNCMPE_DISABLE       (0<<0)
+#define BIT_WATCHDOG_FUNCMPE_MASK       (~(1<<4))
+#define BIT_WATCHDOG_FUNCMPE_ENABLE     (1<<4)
+#define BIT_WATCHDOG_FUNCMPE_DISABLE    (0<<0)
 
 #define BIT_INTST_LOC                   (1<<7)
 #define BIT_INTST_UVLO                  (1<<6)
@@ -189,6 +192,7 @@ const unsigned char aw22xxx_reg_access[AW22XXX_REG_MAX] = {
 #define BIT_INTST_FLASH                 (1<<2)
 #define BIT_INTST_MCUCHK                (1<<1)
 #define BIT_INTST_FUNCMPE               (1<<0)
+#define BIT_WATCHDOG_FUNCMPE            (1<<4)
 
 #define BIT_IMAX_MASK                   (~(15<<0))
 #define BIT_IMAX_75mA                   ( 7<<0)

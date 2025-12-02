@@ -919,10 +919,19 @@ void pm_show_rpmh_master_stats(void)
 
 				struct subsystem_data *subsystem = &(subsystems_zte[j].ss_data);
 				struct sleep_stats *stat;
-
+#ifdef CONFIG_PMLOG_PAD
+				/* Started by AICoder, pid:a1c4afd832m7bef147b40aca70394e0c2f81f004 */
+				const char *name = subsystem->name;
+				if (strcmp(name, "modem") == 0) {
+					pr_info("Skip %s stats dump for PANAX \n", name);
+					continue;
+				}
+				/* Ended by AICoder, pid:a1c4afd832m7bef147b40aca70394e0c2f81f004 */
+#endif
 				stat = qcom_smem_get(subsystem->pid, subsystem->smem_item, NULL);
-				if (IS_ERR(stat))
+				if (IS_ERR(stat)) {
 					return ;
+				}
 				print_sleep_stats_zte(subsystem->name, stat);
 			}
 		}

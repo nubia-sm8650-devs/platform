@@ -293,29 +293,56 @@ def define_pineapple():
         "drivers/vendor/soc/qcom/imem_info/zte_imem_info.ko",
         "drivers/vendor/soc/qcom/kmparam/kmparam.ko",
         "drivers/leds/aw22xxx/zte_led.ko",
-        "drivers/misc/haptic_hv/haptic.ko",
         "drivers/vendor/common/power/charger_policy/charger_policy_service.ko",
         "drivers/vendor/common/power/misc/zte_misc.ko",
         "drivers/vendor/common/power/zte_supply/zte_power_supply.ko",
         "drivers/vendor/soc/qcom/pmlog/pm_debug.ko",
         "drivers/vendor/soc/qcom/stats_info/zte_stats_info.ko",
         "drivers/nubia/sensors_sensitivity/zte_sensor.ko",
-        "drivers/media/rc/zte_ir.ko",
-        "drivers/nfc/st54j/st54jnfc.ko",
-        "drivers/nfc/st54j/st54jese.ko",
         "drivers/block/zram/zram.ko",
         "mm/zsmalloc.ko",
         "kernel/trace/msm_rtb.ko",
+        "drivers/input/fingerprint/silead/fp_silead.ko",
+        "drivers/remoteproc/zte_reboot_ext.ko",
+        "drivers/soc/qcom/zte_ramdisk_reboot.ko",
     ]
 
     _tiro_in_tree_modules = [
        "drivers/vendor/common/fan/soc_fan.ko",
        "drivers/vendor/common/nubia_hw_version/nubia_hw_version.ko",
        "drivers/vendor/common/aw96205/aw9620x.ko",
+       "drivers/media/rc/zte_ir.ko",
+       "drivers/nfc/st54j/st54jnfc.ko",
+       "drivers/nfc/st54j/st54jese.ko",
+       "drivers/misc/haptic_hv/haptic.ko",
     ]
 
     _cerro_in_tree_modules = [
        "drivers/input/hall/ah1898_hall.ko",
+      "drivers/media/rc/zte_ir.ko",
+      "drivers/nfc/st54j/st54jnfc.ko",
+      "drivers/nfc/st54j/st54jese.ko",
+      "drivers/misc/haptic_hv/haptic.ko",
+    ]
+
+    _panax_in_tree_modules = [
+      "drivers/nfc/nxpntag/nxpntag.ko",
+      "drivers/nfc/nxpwlc/nxpwlc.ko",
+      "drivers/input/hall/ah1898_hall.ko",
+      "drivers/input/hall2/ah1898_hall2.ko",
+      "drivers/vendor/common/fan/soc_fan.ko",
+      "drivers/misc/haptic_86938_hv/haptic_86938.ko",
+      "drivers/vendor/soc/qcom/btkeyboard/zte_btkeyboard.ko",
+      "drivers/vendor/soc/qcom/btkeyboard/gpio_keys-zte.ko",
+    ]
+
+    _qvanise_in_tree_modules = [
+      "drivers/nfc/nxpntag/nxpntag.ko",
+      "drivers/nfc/nxpwlc/nxpwlc.ko",
+      "drivers/input/hall/ah1898_hall.ko",
+      "drivers/input/hall2/ah1898_hall2.ko",
+      "drivers/vendor/soc/qcom/btkeyboard/zte_btkeyboard.ko",
+      "drivers/vendor/soc/qcom/btkeyboard/gpio_keys-zte.ko",
     ]
 
     _zlog_in_tree_modules = [
@@ -344,6 +371,10 @@ def define_pineapple():
             mod_list += _tiro_in_tree_modules
         elif ZTE_BOARD_NAME == "cerro":
             mod_list += _cerro_in_tree_modules
+        elif ZTE_BOARD_NAME == "panax":
+            mod_list += _panax_in_tree_modules
+        elif ZTE_BOARD_NAME == "qvanise":
+            mod_list += _qvanise_in_tree_modules
 
         if ZTE_FEATURE_ZTE_LOG_EXCEPTION == "true":
             mod_list += _zlog_in_tree_modules

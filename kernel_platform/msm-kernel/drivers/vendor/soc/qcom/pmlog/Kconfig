@@ -7,6 +7,12 @@ config VENDOR_PMLOG
   help
     This program is used for recode the ap and modem's sleep and wake time
 
+config PMLOG_PAD
+    bool "Distinguish between cell phones and tablets"
+    default n
+    help
+      Remove modem sleep stats print for panax
+
 config VENDOR_PMLOG_PLATFORM
     int "PMLog Platform"
     default 98

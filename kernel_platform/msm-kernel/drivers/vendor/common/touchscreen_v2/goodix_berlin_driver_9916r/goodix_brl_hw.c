@@ -1931,32 +1931,6 @@ int report_rate_960HZ(struct goodix_ts_core *cd, int mark)
 	return 0;
 }
 
-int high_speed_report_rate(struct goodix_ts_core *cd, int enable)
-{
-	struct goodix_ts_cmd cmd;
-
-	cmd.len = 05;
-	cmd.cmd = 0xC2;
-
-	if (enable) {
-		ts_info("%s success enter high speed", __func__);
-		cmd.data[0] = 0x01;
-		cmd.data[1] = 0xC8;
-		cmd.data[2] = 0x00;
-	} else {
-		ts_info("%s success exit high speed", __func__);
-		cmd.data[0] = 0x00;
-		cmd.data[1] = 0xC7;
-		cmd.data[2] = 0x00;
-	}
-	if (cd->hw_ops->send_cmd(cd, &cmd)) {
-		ts_err("%s: failed send cmd", __func__);
-		return -EIO;
-	}
-
-	return 0;
-}
-
 int zte_tp_set_report_rate(struct goodix_ts_core *cd, int enable)
 {
 	static int current_report_mode = tp_freq_240Hz;
@@ -1972,21 +1946,11 @@ int zte_tp_set_report_rate(struct goodix_ts_core *cd, int enable)
 					ret = report_rate_480HZ(cd, 0);
 					if (ret < 0)
 						return ret;
-#ifdef CONFIG_TOUCHSCREEN_IOVDD_GPIO_POWER
-					ret = high_speed_report_rate(cd, 0);
-					if (ret < 0)
-						return ret;
-#endif
 				}
 				if (current_report_mode == tp_freq_480Hz) {
 					ret = report_rate_480HZ(cd, 0);
 					if (ret < 0)
 						return ret;
-#ifdef CONFIG_TOUCHSCREEN_IOVDD_GPIO_POWER
-					ret = high_speed_report_rate(cd, 0);
-					if (ret < 0)
-						return ret;
-#endif
 				}
 				ret = report_rate_120HZ(cd, 1);
 				if (ret < 0)
@@ -2001,21 +1965,11 @@ int zte_tp_set_report_rate(struct goodix_ts_core *cd, int enable)
 					ret = report_rate_480HZ(cd, 0);
 					if (ret < 0)
 						return ret;
-#ifdef CONFIG_TOUCHSCREEN_IOVDD_GPIO_POWER
-					ret = high_speed_report_rate(cd, 0);
-					if (ret < 0)
-						return ret;
-#endif
 				}
 				if (current_report_mode == tp_freq_480Hz) {
 					ret = report_rate_480HZ(cd, 0);
 					if (ret < 0)
 						return ret;
-#ifdef CONFIG_TOUCHSCREEN_IOVDD_GPIO_POWER
-					ret = high_speed_report_rate(cd, 0);
-					if (ret < 0)
-						return ret;
-#endif
 				}
 				ret = report_rate_240HZ(cd, 1);
 				if (ret < 0)
@@ -2032,11 +1986,6 @@ int zte_tp_set_report_rate(struct goodix_ts_core *cd, int enable)
 					ret = report_rate_480HZ(cd, 1);
 					if (ret < 0)
 						return ret;
-#ifdef CONFIG_TOUCHSCREEN_IOVDD_GPIO_POWER
-					ret = high_speed_report_rate(cd, 1);
-					if (ret < 0)
-						return ret;
-#endif
 				}
 				current_report_mode = tp_freq_480Hz;
 				break;
@@ -2052,11 +2001,6 @@ int zte_tp_set_report_rate(struct goodix_ts_core *cd, int enable)
 					ret = report_rate_960HZ(cd, 1);
 					if (ret < 0)
 						return ret;
-#ifdef CONFIG_TOUCHSCREEN_IOVDD_GPIO_POWER
-					ret = high_speed_report_rate(cd, 1);
-					if (ret < 0)
-						return ret;
-#endif
 				}
 				current_report_mode = tp_freq_960Hz;
 				break;
@@ -2201,9 +2145,69 @@ int zte_follow_hand_level(struct goodix_ts_core *cd, int enable)
 	return 0;
 }
 
-int enable_game_mode(struct goodix_ts_core *cd, int enable)
+int zte_stability_level(struct goodix_ts_core *cd, int enable)
 {
 	struct goodix_ts_cmd cmd;
+
+	if (cd->bus->ic_type == IC_TYPE_BERLIN_D) {
+		cmd.len = 05;
+		cmd.cmd = 0x29;
+		switch (enable) {
+		case stability_level_0:
+			ts_info("%s success in stability_level_0", __func__);
+			cmd.data[0] = 0x00;
+			if (cd->hw_ops->send_cmd(cd, &cmd)) {
+				ts_err("%s: failed send cmd", __func__);
+				return -EIO;
+			}
+			break;
+		case stability_level_1:
+			ts_info("%s success in stability_level_1", __func__);
+			cmd.data[0] = 0x01;
+			if (cd->hw_ops->send_cmd(cd, &cmd)) {
+				ts_err("%s: failed send cmd", __func__);
+				return -EIO;
+			}
+			break;
+		case stability_level_2:
+			ts_info("%s success in stability_level_2", __func__);
+			cmd.data[0] = 0x02;
+			if (cd->hw_ops->send_cmd(cd, &cmd)) {
+				ts_err("%s: failed send cmd", __func__);
+				return -EIO;
+			}
+			break;
+		case stability_level_3:
+			ts_info("%s success in stability_level_3", __func__);
+			cmd.data[0] = 0x03;
+			if (cd->hw_ops->send_cmd(cd, &cmd)) {
+				ts_err("%s: failed send cmd", __func__);
+				return -EIO;
+			}
+			break;
+		case stability_level_4:
+			ts_info("%s success in stability_level_4", __func__);
+			cmd.data[0] = 0x04;
+			if (cd->hw_ops->send_cmd(cd, &cmd)) {
+				ts_err("%s: failed send cmd", __func__);
+				return -EIO;
+			}
+			break;
+		default:
+			ts_err("%s: enable not support", __func__);
+			return 0;
+		}
+	}else {
+		ts_err("%s: not support", __func__);
+		return 0;
+	}
+	return 0;
+}
+
+int zte_play_game(struct goodix_ts_core *cd, int enable)
+{
+	struct goodix_ts_cmd cmd;
+	int ret = 0;
 
 	cmd.len = 06;
 	cmd.cmd = 0xC2;
@@ -2212,39 +2216,48 @@ int enable_game_mode(struct goodix_ts_core *cd, int enable)
 		cmd.data[0] = 0x01;
 		cmd.data[1] = 0x00;
 		cmd.data[2] = 0xC9;
-	} else {
-		cmd.data[0] = 0x00;
-		cmd.data[1] = 0x00;
-		cmd.data[2] = 0xC8;
-	}
-	if (cd->hw_ops->send_cmd(cd, &cmd)) {
-		ts_err("%s: failed send cmd", __func__);
-		return -EIO;
-	}
-
-	return 0;
-}
-
-int zte_play_game(struct goodix_ts_core *cd, int enable)
-{
-	int ret = 0;
-
-	if (enable) {
-		ret = enable_game_mode(cd, enable);
-		if (ret < 0)
-			return ret;
-	}else {
+		if (cd->hw_ops->send_cmd(cd, &cmd)) {
+			ts_err("%s: failed send cmd", __func__);
+			return -EIO;
+		}
 		ret = zte_sensibility_level(cd, 2);
 		if (ret < 0)
 			return ret;
 		ret = zte_follow_hand_level(cd, 2);
 		if (ret < 0)
 			return ret;
-		ret = enable_game_mode(cd, enable);
+		ret = zte_tp_set_report_rate(cd, 1);
 		if (ret < 0)
 			return ret;
-	}
+		ret = zte_stability_level(cd, 2);
+		if (ret < 0)
+			return ret;
 
+		ts_info("send enter game cmd success");
+	} else {
+		cmd.data[0] = 0x00;
+		cmd.data[1] = 0x00;
+		cmd.data[2] = 0xC8;
+		if (cd->hw_ops->send_cmd(cd, &cmd)) {
+			ts_err("%s: failed send cmd", __func__);
+			return -EIO;
+		}
+		ret = zte_sensibility_level(cd, 2);
+		if (ret < 0)
+			return ret;
+		ret = zte_follow_hand_level(cd, 2);
+		if (ret < 0)
+			return ret;
+		ret = zte_tp_set_report_rate(cd, 1);
+		if (ret < 0)
+			return ret;
+		ret = zte_stability_level(cd, 2);
+		if (ret < 0)
+			return ret;
+		
+		ts_info("send exit game cmd success");
+	}
+	
 	return 0;
 }
 
@@ -2334,6 +2347,7 @@ static struct goodix_ts_hw_ops brl_hw_ops = {
 	.set_tp_report_rate = zte_tp_set_report_rate,
 	.set_sensibility = zte_sensibility_level,
 	.set_follow_hand_level = zte_follow_hand_level,
+	.set_stability_level = zte_stability_level,
 	.set_zte_play_game = zte_play_game,
 #ifdef GOODIX_USB_DETECT_GLOBAL
 	.set_enter_charger = zte_brl_enter_charger,

@@ -38,6 +38,52 @@ static struct zlog_mod_info zlog_q6v5_dev = {
 };
 #endif
 
+/* Started by AICoder, pid:z0c4df4357e1d5f143e70b5760f5292d04d25f0b */
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+
+#define CONST_TAG_M 'M'  // single char for modem
+#define CONST_TAG_A 'A'   // single char for adsp
+#define CONST_TAG_C 'C'   // single char for cdsp
+#define CONST_TAG_S 'S'   // single char for slpi
+
+#define SUBSYS_PANIC_STUB_U8 0x39  // char '9'
+#define SUBSYS_PANIC_CLEAR_U8 0x32  // char '2' equal to its init val
+
+static atomic_t ss_atomic_panic_intval = ATOMIC_INIT(SUBSYS_PANIC_STUB_U8);
+
+u8 get_ss_panic_buf_byte(void) {
+	return (u8)atomic_read(&ss_atomic_panic_intval);
+}
+EXPORT_SYMBOL(get_ss_panic_buf_byte);
+
+void set_ss_panic_buf_byte(u8 val) {
+	atomic_set(&ss_atomic_panic_intval, (int)val);
+}
+EXPORT_SYMBOL(set_ss_panic_buf_byte);
+#endif
+/* Ended by AICoder, pid:z0c4df4357e1d5f143e70b5760f5292d04d25f0b */
+
+/* Started by AICoder, pid:ee74df7b45ab2cf14c22084fd0fcb21cb278509e */
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+u8 get_ss_symbol_from_rproc_name(struct qcom_q6v5 *q6v5) {
+	u8 ret = SUBSYS_PANIC_STUB_U8;
+
+	if (q6v5 && q6v5->rproc && q6v5->rproc->name) {
+		if (strstr(q6v5->rproc->name, "remoteproc-mss")) {
+			ret = CONST_TAG_M;
+		} else if (strstr(q6v5->rproc->name, "remoteproc-adsp")) {
+			ret = CONST_TAG_A;
+		} else if (strstr(q6v5->rproc->name, "remoteproc-slpi")) {
+			ret = CONST_TAG_S;
+		} else if (strstr(q6v5->rproc->name, "remoteproc-cdsp")) {
+			ret = CONST_TAG_C;
+		}
+	}
+	return ret;
+}
+#endif
+/* Ended by AICoder, pid:ee74df7b45ab2cf14c22084fd0fcb21cb278509e */
+
 /**
  * qcom_q6v5_prepare() - reinitialize the qcom_q6v5 context before start
  * @q6v5:	reference to qcom_q6v5 context to be reinitialized
@@ -128,6 +174,7 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 	if (!IS_ERR(msg) && len > 0 && msg[0]) {
 		dev_err(q6v5->dev, "watchdog received: %s\n", msg);
 		trace_rproc_qcom_event(dev_name(q6v5->dev), "q6v5_wdog", msg);
+
 #ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
 		if (zlog_q6v5_client) {
 			if (q6v5->rproc && q6v5->rproc->name &&
@@ -142,6 +189,13 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 	} else {
 		dev_err(q6v5->dev, "watchdog without message\n");
 	}
+
+	/* Started by AICoder, pid:3917237cf3r32661460408a470d97a2644e5b662 */
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+	set_ss_panic_buf_byte(get_ss_symbol_from_rproc_name(q6v5));
+	dev_info(q6v5->dev, "ztedbg w byte %x\n", get_ss_panic_buf_byte());
+#endif
+	/* Ended by AICoder, pid:3917237cf3r32661460408a470d97a2644e5b662 */
 
 	q6v5->running = false;
 	dev_err(q6v5->dev, "rproc recovery state: %s\n",
@@ -176,6 +230,7 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	if (!IS_ERR(msg) && len > 0 && msg[0]) {
 		dev_err(q6v5->dev, "fatal error received: %s\n", msg);
 		trace_rproc_qcom_event(dev_name(q6v5->dev), "q6v5_fatal", msg);
+
 #ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
 		if (zlog_q6v5_client) {
 			if (q6v5->rproc && q6v5->rproc->name &&
@@ -190,6 +245,13 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	} else {
 		dev_err(q6v5->dev, "fatal error without message\n");
 	}
+
+	/* Started by AICoder, pid:3917237cf3r32661460408a470d97a2644e5b662 */
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+	set_ss_panic_buf_byte(get_ss_symbol_from_rproc_name(q6v5));
+	dev_info(q6v5->dev, "ztedbg f byte %x\n", get_ss_panic_buf_byte());
+#endif
+	/* Ended by AICoder, pid:3917237cf3r32661460408a470d97a2644e5b662 */
 
 	q6v5->running = false;
 	dev_err(q6v5->dev, "rproc recovery state: %s\n",
@@ -228,10 +290,35 @@ static irqreturn_t q6v5_ready_interrupt(int irq, void *data)
 int qcom_q6v5_wait_for_start(struct qcom_q6v5 *q6v5, int timeout)
 {
 	int ret;
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+	/* Started by AICoder, pid:7f631zec9feff0814c780bb2f0abcb2af848c855 */
+	u8 check_val;
+	u8 read_val;
+	/* Ended by AICoder, pid:7f631zec9feff0814c780bb2f0abcb2af848c855 */
+#endif
 
 	ret = wait_for_completion_timeout(&q6v5->start_done, timeout);
 	if (!ret)
 		disable_irq(q6v5->handover_irq);
+
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+	/* Started by AICoder, pid:7f631zec9feff0814c780bb2f0abcb2af848c855 */
+	if (ret) {  // not timeout, start ready
+		// check if clear ss tag in pmic reg
+		check_val = get_ss_symbol_from_rproc_name(q6v5);
+		read_val = get_ss_panic_buf_byte();
+
+		if (read_val == check_val) {
+			dev_info(q6v5->dev, "ztedbg clear ss panic tag %x\n", read_val);
+			set_ss_panic_buf_byte(SUBSYS_PANIC_CLEAR_U8);
+		} else {
+			dev_info(q6v5->dev, "ztedbg skip clear ss panic tag %x %x\n", read_val, check_val);
+		}
+	} else {
+		dev_info(q6v5->dev, "ztedbg ss recover timeout\n");
+	}
+	/* Ended by AICoder, pid:7f631zec9feff0814c780bb2f0abcb2af848c855 */
+#endif
 
 	return !ret ? -ETIMEDOUT : 0;
 }

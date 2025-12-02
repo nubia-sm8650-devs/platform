@@ -61,6 +61,12 @@ extern void  fts_ts_exit(void);
 int ufp_mac_init(void);
 void  ufp_mac_exit(void);
 #endif
+
+#ifdef CONFIG_TOUCHSCREEN_NT36XXX_TOUCH_36532W
+extern int32_t  nvt_driver_init(void);
+extern void nvt_driver_exit(void);
+#endif
+
 void tpd_clean_all_event(void);
 int tpd_report_work_init(void);
 void tpd_report_work_deinit(void);

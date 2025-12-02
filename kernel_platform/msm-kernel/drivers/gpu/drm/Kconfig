@@ -527,3 +527,8 @@ config DRM_LIB_RANDOM
 config DRM_PRIVACY_SCREEN
 	bool
 	default n
+
+# ZTE LCD config
+config ZTE_LCD_USE_I2C
+ 	bool "Support for ZTE I2C devices"
+	

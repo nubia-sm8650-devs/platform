@@ -548,6 +548,18 @@ static void qcom_wdt_user_pet_bite(struct timer_list *t)
 	}
 }
 
+#ifdef CONFIG_VENDOR_PANIC_SIMULATION
+/* Started by AICoder, pid:k2a0ai53e5p8ea01472b08cbe0f7d10de0175f0c */
+static int zte_trigger_wdt = 0;
+
+int zte_set_wdt_trigger_flag(void) {
+    zte_trigger_wdt++;
+    return zte_trigger_wdt;
+}
+EXPORT_SYMBOL(zte_set_wdt_trigger_flag);
+/* Ended by AICoder, pid:k2a0ai53e5p8ea01472b08cbe0f7d10de0175f0c */
+#endif
+
 static __ref int qcom_wdt_kthread(void *arg)
 {
 	struct msm_watchdog_data *wdog_dd = arg;
@@ -560,6 +572,13 @@ static __ref int qcom_wdt_kthread(void *arg)
 		do {
 			ret = wait_event_interruptible(wdog_dd->pet_complete,
 						wdog_dd->timer_expired);
+#ifdef CONFIG_VENDOR_PANIC_SIMULATION
+			if (zte_trigger_wdt > 0) {
+				ret = -1;
+				wdog_dd->timer_expired = false;
+				dev_err(wdog_dd->dev, "ztedbg stop wdt pet\n");
+			}
+#endif
 		} while (ret != 0);
 
 		wdog_dd->thread_start = sched_clock();
@@ -685,6 +704,15 @@ void qcom_wdt_trigger_bite(void)
 }
 EXPORT_SYMBOL(qcom_wdt_trigger_bite);
 
+/* Started by AICoder, pid:b48ba32f2eh699e1464d0bebd02973030096e6b4 */
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+#define SDAM_RAMDISK_LEN 1
+#define CONST_TAG_W 'W'
+extern int zte_ramdisk_reboot_write(u8 *ptr, int len);
+static u8 wdt_char_str[SDAM_RAMDISK_LEN] = {0x57};  // char W
+#endif
+/* Ended by AICoder, pid:b48ba32f2eh699e1464d0bebd02973030096e6b4 */
+
 static irqreturn_t qcom_wdt_bark_handler(int irq, void *dev_id)
 {
 	struct msm_watchdog_data *wdog_dd = dev_id;
@@ -698,6 +726,17 @@ static irqreturn_t qcom_wdt_bark_handler(int irq, void *dev_id)
 	nanosec_rem = do_div(wdog_dd->last_pet, 1000000000);
 	dev_info(wdog_dd->dev, "QCOM Apps Watchdog last pet at %lu.%06lu\n",
 			(unsigned long) wdog_dd->last_pet, nanosec_rem / 1000);
+
+	/* Started by AICoder, pid:ve3a6k59ecg581a1435c0a5360b7360d33d7b229 */
+#if IS_MODULE(CONFIG_VENDOR_ZLOG_RESET_REASON)
+	if (zte_ramdisk_reboot_write(wdt_char_str, 1) != 0) {
+		dev_err(wdog_dd->dev, "ztedbg write wdt failed\n");
+	} else {
+		dev_info(wdog_dd->dev, "ztedbg write wdt flag\n");
+	}
+#endif
+	/* Ended by AICoder, pid:ve3a6k59ecg581a1435c0a5360b7360d33d7b229 */
+
 	if (wdog_dd->do_ipi_ping)
 		qcom_wdt_dump_cpu_alive_mask(wdog_dd);
 

@@ -603,6 +603,17 @@ config QCOM_WDT_CORE
 	   watchdog module must be loaded along with this for watchdog
 	   functionality.
 
+config VENDOR_RAMDISK_ZLOG_REASON
+	tristate "ZTE LOG REASON IN RAMDISK STAGE"
+	help
+	  Say Y here, if supported zte log ramdisk reason
+
+config VENDOR_PANIC_SIMULATION
+	tristate "ZTE SIMULATE PANIC SUPPORT"
+	default n
+	help
+	  Say Y here, if supported simulate some panics
+
 config QCOM_SOC_WATCHDOG
 	tristate "Qualcomm Technologies, Inc. Soc Watchdog"
 	depends on QCOM_WDT_CORE
@@ -1119,6 +1130,12 @@ config QCOM_S2D_VENDOR_HOOK
 	  hibernation. Callbacks implemented here are called from the
           core kernel and help to do bootloader hibernation specific job.
 	  Enable this if bootloader hibernation is enabled.
+
+config PMLOG_PAD
+	bool "Distinguish between cell phones and tablets"
+	default n
+	help
+	  Remove modem sleep stats print for panax
 
 config QCOM_SECURE_HIBERNATION
 	tristate "Add security support to hibernation"
