@@ -73,7 +73,7 @@
 
 // FM changes
 &qupv3_se6_i2c {
-    status = "ok";
+    status = "disabled";
 	nq@64 {
 		compatible = "rtc6226";
 		reg = <0x64>;

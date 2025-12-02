@@ -1,4 +1,5 @@
 #include <dt-bindings/msm-camera.h>
+
 &tlmm {
 	cam_sensor_active_rst2: cam_sensor_active_rst2 {
 		/* RESET 2 */
@@ -118,6 +119,10 @@
 };
 
 &soc {
+	cam_csiphy2: qcom,csiphy2@ace8000 {
+		compatible = "qcom,csiphy-v2.2.0_gn5_wifi", "qcom,csiphy";
+	};
+
 	led_flash_triple_rear_wide: qcom,camera-flash1 {
 		cell-index = <1>;
 		compatible = "qcom,camera-flash";
@@ -463,6 +468,5 @@
 		clock-rates = <24000000>;
 		status = "ok";
 	};
-
 };
 

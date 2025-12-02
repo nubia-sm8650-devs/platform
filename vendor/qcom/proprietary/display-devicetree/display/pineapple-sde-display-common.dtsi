@@ -17,15 +17,6 @@
 #include "dsi-panel-r66451-dsc-fhd-plus-sync-cmd.dtsi"
 #include "dsi-panel-r66451-fhd-plus-90hz-cmd-cphy.dtsi"
 #include "dsi-panel-ext-bridge-1080p.dtsi"
-#include "dsi-panel-sim-cmd.dtsi"
-#include "dsi-panel-sim-video.dtsi"
-#include "dsi-panel-sim-dsc375-cmd.dtsi"
-#include "dsi-panel-sim-dsc-10bit-cmd.dtsi"
-#include "dsi-panel-sim-dualmipi-cmd.dtsi"
-#include "dsi-panel-sim-dualmipi-video.dtsi"
-#include "dsi-panel-sim-dualmipi-dsc375-cmd.dtsi"
-#include "dsi-panel-sim-sec-hd-cmd.dtsi"
-#include "dsi-panel-sim-cmd-au.dtsi"
 #include "dsi-panel-nt35597-truly-dualmipi-wqxga-splitlink-cmd.dtsi"
 #include "dsi-panel-r66451-fhd-plus-90hz-video-cphy.dtsi"
 #include "dsi-panel-nt35695b-truly-fhd-splitlink-cmd.dtsi"
@@ -112,6 +103,7 @@
 			qcom,supply-disable-load = <100>;
 		};
 	};
+
 
 	sde_dsi: qcom,dsi-display-primary {
 		compatible = "qcom,dsi-display";

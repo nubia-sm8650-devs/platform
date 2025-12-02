@@ -40,8 +40,12 @@ dtbo-y += sdxpinn-cnss.dtbo
 endif
 
 ifeq ($(CONFIG_ARCH_PINEAPPLE),y)
-dtbo-y += pineapple-kiwi-cnss.dtbo
-dtbo-y += pineapplep-hdk-kiwi-cnss.dtbo
+  ifneq (,$(filter panax qvanise,$(ZTE_BOARD_NAME)))
+    dtbo-y += pineapplep-hdk-kiwi-cnss-zte-panax.dtbo
+  else
+    dtbo-y += pineapple-kiwi-cnss.dtbo
+    dtbo-y += pineapplep-hdk-kiwi-cnss.dtbo
+  endif
 endif
 
 ifeq ($(CONFIG_ARCH_MONACO),y)

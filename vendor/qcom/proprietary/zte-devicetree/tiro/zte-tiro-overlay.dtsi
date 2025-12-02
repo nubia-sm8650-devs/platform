@@ -55,7 +55,7 @@
 		zte,ufp_enable;
 		zte,ufp_circle_center_x = <8928>;
 		zte,ufp_circle_center_y = <29728>;
-		zte,ufp_circle_radius = <1280>;
+		zte,ufp_circle_radius = <1920>;
 	};
 
 	nubia_hw_ver_gpio: nubia_hw_gpio_ctrl {
@@ -74,7 +74,7 @@
 	};
 
 	gpio_keys_nubia {
-        status = "okay";
+		status = "okay";
 		compatible = "gpio-keys_nubia";
 		label = "gpio-keys_nubia";
 
@@ -89,10 +89,20 @@
 		};
 	};
 
-    nubia_usb_switch_dp_gpio: nubia_usb_switch_dp_gpio_ctrl {
-        compatible = "nubia,usb_switch_dp";
-        status = "okay";
-    };
+	nubia_usb_switch_dp_gpio: nubia_usb_switch_dp_gpio_ctrl {
+		compatible = "nubia,usb_switch_dp";
+		status = "okay";
+	};
+
+	regulator-ocp-notifier {
+		periph-ac1-supply = <&L1K>;
+		periph-ac2-supply = <&L2K>;
+		periph-ac3-supply = <&L3K>;
+		periph-ac4-supply = <&L4K>;
+		periph-ac5-supply = <&L5K>;
+		periph-ac6-supply = <&L6K>;
+		periph-ac7-supply = <&L7K>;
+	};
 };
 
 &qupv3_se4_spi {
@@ -348,8 +358,85 @@
 		aw-re-max= <30000>;
 		/*aw-cali-mode = "none";*/
 	};
-};
 	/* AWINIC AW882XX Smart PA End */
+
+/*aw22xxx_led start*/
+	aw22xxx_led@6a {
+		status = "okay";
+		compatible = "awinic,aw22xxx_led";
+		reg = <0x6a>;
+		reset-gpio = <&tlmm 123 0x0>;
+		nubia_ver-gpio = <&tlmm 7 1>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <85 0x2002>;
+		irq-gpio = <&tlmm 85 0x2002>;
+		qcom,clk-freq-out = <400000>;
+		pinctrl-names = "aw22xxx_led_default", "aw22xxx_led_sleep";
+		pinctrl-0 = <&aw22xxx_int_active &aw22xxx_reset_active>;
+		pinctrl-1 = <&aw22xxx_int_suspend &aw22xxx_reset_suspend>;
+		aw22xxx,led {
+			aw22xxx,name = "aw22xxx_led";
+			aw22xxx,imax = <9>;
+			aw22xxx,brightness = <128>;
+			aw22xxx,max_brightness = <255>;
+		};
+	};
+};
+
+&tlmm{
+		aw22xxx_reset {
+			aw22xxx_reset_active: aw22xxx_reset_active {
+				mux {
+					pins = "gpio123";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio123";
+					drive-strength = <6>;
+					bias-pull-up;
+				};
+			};
+
+			aw22xxx_reset_suspend: aw22xxx_reset_suspend {
+				mux {
+					pins = "gpio123";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio123";
+					drive-strength = <6>;
+					bias-pull-up;
+				};
+			};
+		};
+
+		aw22xxx_int {
+			aw22xxx_int_active: aw22xxx_int_active {
+				mux {
+					pins = "gpio85";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio85";
+					drive-strength = <6>;
+					bias-pull-up;
+				};
+			};
+			aw22xxx_int_suspend: aw22xxx_int_suspend {
+				mux {
+					pins = "gpio85";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio85";
+					drive-strength = <6>;
+					bias-pull-up;
+				};
+			};
+		};
+};
+/*aw22xxx_led end*/
+
 
 /* add zte haptic start */
 &qupv3_hub_i2c4 {

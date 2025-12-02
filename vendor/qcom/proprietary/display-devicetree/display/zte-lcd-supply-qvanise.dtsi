@@ -1,0 +1,102 @@
+#include "pineapple-sde-display-mtp.dtsi"
+#include "dsi-panel-hx8394d-10p99-dsc-144hz-video-dphy.dtsi"
+
+&soc {
+	/*add for pad2*/
+	
+	display_panel_vddd: display_panel_vddd {
+		compatible = "qti-regulator-fixed";
+		regulator-name = "display_panel_vddd";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		gpio = <&tlmm 14 0>;
+		enable-active-high;
+		regulator-boot-on;
+	};
+		
+	display_panel_vddio: display_panel_vddio {
+		compatible = "qti-regulator-fixed";
+		regulator-name = "display_panel_vddio";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		gpio = <&tlmm 53 0>;
+		enable-active-high;
+		regulator-boot-on;
+	};
+		
+	display_panel_vsp: display_panel_vsp {
+		compatible = "qti-regulator-fixed";
+		regulator-name = "display_panel_vsp";
+		regulator-min-microvolt = <5900000>;
+		regulator-max-microvolt = <5900000>;
+		gpio = <&tlmm 91 0>;
+		enable-active-high;
+		regulator-boot-on;
+	};
+
+	display_panel_vsn: display_panel_vsn {
+		compatible = "qti-regulator-fixed";
+		regulator-name = "display_panel_vsn";
+		regulator-min-microvolt = <5900000>;
+		regulator-max-microvolt = <5900000>;
+		gpio = <&tlmm 105 0>;
+		enable-active-high;
+		regulator-boot-on;
+	};
+	
+	dsi_panel_pwr_supply_hx8394d: dsi_panel_pwr_supply_hx8394d {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		qcom,panel-supply-entry@0 {
+			reg = <0>;
+			qcom,supply-name = "vdddpanax";
+			qcom,supply-min-voltage = <1800000>;
+			qcom,supply-max-voltage = <1800000>;
+			qcom,supply-enable-load = <200000>;
+			qcom,supply-disable-load = <80>;
+			qcom,supply-post-on-sleep = <1>;
+			qcom,supply-post-off-sleep = <2>;
+		};
+		
+		qcom,panel-supply-entry@1 {
+			reg = <1>;
+			qcom,supply-name = "vddiopanax";
+			qcom,supply-min-voltage = <1200000>;
+			qcom,supply-max-voltage = <1200000>;
+			qcom,supply-enable-load = <290000>;
+			qcom,supply-disable-load = <0>;
+			qcom,supply-post-on-sleep = <0>;
+			qcom,supply-pre-off-sleep = <1>;
+			qcom,supply-post-off-sleep = <2>;
+		};
+
+		qcom,panel-supply-entry@2 {
+			reg = <2>;
+			qcom,supply-name = "vsp";
+			qcom,supply-min-voltage = <5900000>;
+			qcom,supply-max-voltage = <5900000>;
+			qcom,supply-enable-load = <20000>;
+			qcom,supply-disable-load = <0>;
+			qcom,supply-post-on-sleep = <0>;
+			qcom,supply-pre-off-sleep = <5>;
+			qcom,supply-post-off-sleep = <5>;
+		};
+
+		qcom,panel-supply-entry@3 {
+			reg = <3>;
+			qcom,supply-name = "vsn";
+			qcom,supply-min-voltage = <5900000>;
+			qcom,supply-max-voltage = <5900000>;
+			qcom,supply-enable-load = <0>;
+			qcom,supply-disable-load = <0>;
+			qcom,supply-post-on-sleep = <12>;
+		};
+	};
+};
+&sde_dsi {
+	vdddpanax-supply = <&display_panel_vddd>;
+	vddiopanax-supply = <&display_panel_vddio>;
+	vsp-supply = <&display_panel_vsp>;
+	vsn-supply = <&display_panel_vsn>;
+};

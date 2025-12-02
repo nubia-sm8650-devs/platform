@@ -69,20 +69,20 @@
 };
 
 &soc {
-    gpio_keys_nubia {
-        status = "okay";
-        compatible = "gpio-keys_nubia";
-        label = "gpio-keys_nubia";
-        game_sw {
-            label = "game_sw";
-            gpios = <&tlmm 174 0>;
-            gpion = <&tlmm 182 0>;
-            linux,input-type = <5>;
-            linux,code = <0x0a>;
-            debounce-interval = <30>;
-            gpio-key,wakeup;
-        };
-    };
+	gpio_keys_nubia {
+		status = "okay";
+		compatible = "gpio-keys_nubia";
+		label = "gpio-keys_nubia";
+		game_sw {
+			label = "game_sw";
+			gpios = <&tlmm 174 0>;
+			gpion = <&tlmm 182 0>;
+			linux,input-type = <5>;
+			linux,code = <0x0a>;
+			debounce-interval = <30>;
+			gpio-key,wakeup;
+		};
+	};
 
 	zte_tp:zte_tp {
 		compatible = "zte_tp";
@@ -99,10 +99,10 @@
 		zte,ufp_enable;
 		zte,ufp_circle_center_x = <8928>;
 		zte,ufp_circle_center_y = <29728>;
-		zte,ufp_circle_radius = <1280>;
+		zte,ufp_circle_radius = <1920>;
 	};
-	
-    hall_sensor {
+
+	hall_sensor {
 		compatible = "ah,hall_ic";
 		vddio-supply = <&L1B>;
 		linux,min-uv = <1800000>;
@@ -114,6 +114,16 @@
 	nubia_usb_switch_dp_gpio: nubia_usb_switch_dp_gpio_ctrl {
 		compatible = "nubia,usb_switch_dp";
 		status = "okay";
+	};
+
+	regulator-ocp-notifier {
+		periph-ac1-supply = <&L1K>;
+		periph-ac2-supply = <&L2K>;
+		periph-ac3-supply = <&L3K>;
+		periph-ac4-supply = <&L4K>;
+		periph-ac5-supply = <&L5K>;
+		periph-ac6-supply = <&L6K>;
+		periph-ac7-supply = <&L7K>;
 	};
 };
 
