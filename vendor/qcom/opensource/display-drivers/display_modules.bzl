@@ -145,6 +145,7 @@ module_entry(
             "msm/zte_disp/zte_panel_feature.c",
             "msm/zte_disp/zte_panel_work.c",
             "msm/zte_disp/zte_lcd_reg_debug.c",
+			"msm/zte_disp/zte_disp_i2c.c",
          ],
          "CONFIG_DSI_PARSER" : [
             "msm/dsi/dsi_parser.c",

@@ -89,6 +89,16 @@ struct dsi_dfps_capabilities {
 	u32 *dfps_list;
 	u32 dfps_list_len;
 	bool dfps_support;
+	/* add by zte begin */
+	u32 *dec_vfp_list;
+	u32 *dec_hfp_list;
+	u32 *dec_hsa_list;
+	u32 *dec_hbp_list;
+	u32 dec_vfp_list_len;
+	u32 dec_hfp_list_len;
+	u32 dec_hsa_list_len;
+	u32 dec_hbp_list_len;
+	/* add by zte end */
 };
 
 struct dsi_qsync_capabilities {
@@ -246,6 +256,7 @@ struct zte_disp_feature {
 	u32 zte_panel_state;
 	u32 zte_lcd_lspot;
 	u32 zte_lcd_bl_limit;
+	u32 zte_lcd_gesture;
 };
 
 struct dsi_read_config {
@@ -332,12 +343,14 @@ struct dsi_panel {
 	struct delayed_work dim_work;
 	struct delayed_work enter_aod_work;
 	struct delayed_work exit_aod_work;
+	bool enter_dim_worked;
 	bool enter_aod_worked;
 	bool exit_aod_worked;
 	struct workqueue_struct *fod_uiready_wq;
 	struct delayed_work fod_uiready_delayed_work;
 	atomic_t pm_aod; /* truly panel aod power mode */
 	bool bypass_gamut;
+	bool zte_hfp_vfp_vid_switch;
 	/* zte panel config */
 	// #endif
 };
@@ -478,4 +491,6 @@ void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set);
 void dsi_panel_dealloc_cmd_packets(struct dsi_panel_cmd_set *set);
 
 int zte_dsi_panel_tx_cmd_set(struct dsi_panel *panel, enum dsi_cmd_set_type type);
+int zte_dsi_panel_set_fps(struct dsi_panel *panel,int fps);
+
 #endif /* _DSI_PANEL_H_ */

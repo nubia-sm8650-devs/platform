@@ -13,5 +13,5 @@ void zte_dsi_panel_convert_hdr_bl(struct dsi_panel *panel, u32 *bl_lvl);
 void zte_dsi_panel_convert_limit_bl(struct dsi_panel *panel, u32 *bl_lvl);
 
 int zte_dsi_panel_update_backlight(struct dsi_panel *panel, u32 bl_lvl);
-
+int zte_dsi_panel_update_backlight_vid(struct dsi_panel *panel, u32 bl_lvl);
 void zte_lcd_gamespace_bl_limit(struct dsi_panel *panel, u32 bl_limit);

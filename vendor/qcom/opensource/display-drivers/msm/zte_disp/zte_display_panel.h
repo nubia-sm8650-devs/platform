@@ -36,7 +36,8 @@ static const char *zte_node_string[ZTE_LCD_MAX_CTRL] = {
 	"driver/lcd_state",
 	"driver/lcd_bl_limit",
 	"driver/lcd_second_irq_fps",
-	"driver/lcd_spr"
+	"driver/lcd_spr",
+	"driver/lcd_gesture"
 };
 
 static const char *zte_node_string_sec[ZTE_LCD_MAX_CTRL] = {
@@ -55,7 +56,8 @@ static const char *zte_node_string_sec[ZTE_LCD_MAX_CTRL] = {
 	"driver_sec/lcd_state",
 	"driver_sec/lcd_bl_limit",
 	"driver_sec/lcd_second_irq_fps",
-	"driver_sec/lcd_spr"
+	"driver_sec/lcd_spr",
+	"driver_sec/lcd_gesture"
 };
 
 int zte_set_disp_parameter(struct dsi_panel *panel, u32 feature, u32 feature_mode, bool from_node);

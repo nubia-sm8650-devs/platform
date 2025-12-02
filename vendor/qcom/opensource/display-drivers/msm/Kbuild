@@ -253,5 +253,7 @@ msm_drm-$(CONFIG_DRM_MSM) += msm_atomic.o \
 			     msm_smmu.o \
 			     msm_prop.o
 
+msm_drm-$(CONFIG_ZTE_LCD_USE_I2C) += zte_disp/zte_disp_i2c.o
+
 CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
 

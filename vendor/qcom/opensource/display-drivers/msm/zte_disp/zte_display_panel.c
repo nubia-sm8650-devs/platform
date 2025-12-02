@@ -11,7 +11,7 @@ LCD_PROC_FILE_DEFINE(zte_lcd_cur_fps, ZTE_LCD_FPS_CTRL)
 LCD_PROC_FILE_DEFINE(zte_panel_state, ZTE_LCD_STATE_CTRL)
 LCD_PROC_FILE_DEFINE(zte_lcd_lspot, ZTE_LCD_LSPOT)
 LCD_PROC_FILE_DEFINE(zte_lcd_bl_limit, ZTE_LCD_BL_LIMIT)
-
+LCD_PROC_FILE_DEFINE(zte_lcd_gesture,ZTE_LCD_GESTURE)
 
 static int zte_disp_hbm_config(struct dsi_panel *panel)
 {
@@ -92,7 +92,10 @@ void zte_disp_feature_check(struct dsi_panel *panel) {
         zte_lcd_cur_fps_init(panel);
         panel->disp_feature->zte_lcd_cur_fps = 60;
         pr_info("MSM_LCD create FPS node\n");
+    } else if (panel->zte_hfp_vfp_vid_switch) {
+        panel->disp_feature->zte_lcd_cur_fps = 120; // add for PQ83P01
     }
+
 
     feature_enabled = utils->read_bool(utils->data, "zte,color_space_enabled");
     if (feature_enabled) {
@@ -122,6 +125,12 @@ void zte_disp_feature_check(struct dsi_panel *panel) {
 		pr_info("MSM_LCD create bl_limit node\n");
     } else {
         panel->disp_feature->zte_lcd_bl_limit = 0;
+    }
+
+    feature_enabled = utils->read_bool(utils->data, "zte,lcd_gesture");
+    if (feature_enabled) {
+        zte_lcd_gesture_init(panel);
+        panel->disp_feature->zte_lcd_gesture = 0;
     }
 }
 

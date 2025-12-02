@@ -150,6 +150,74 @@ int zte_dsi_panel_update_backlight(struct dsi_panel *panel,
 	return rc;
 }
 
+/* Started by AICoder, pid:39f29t09c9sed14143c90843f08a896dd515601e */
+int zte_dsi_panel_update_backlight_vid(struct dsi_panel *panel, u32 bl_lvl)
+{
+	int rc = 0;
+	unsigned long mode_flags = 0;
+	struct mipi_dsi_device *dsi = NULL;
+	static u32 last_brightness = 0;
+	static bool need_dim = false;
+	static u32 last_fps = 0;
+	int frame_time_us = 0;
+
+	if (!panel || (bl_lvl > 0xffff)) {
+		DSI_ERR("invalid params\n");
+		return -EINVAL;
+	}
+
+	dsi = &panel->mipi_device;
+	panel->saved_backlight = bl_lvl;
+
+    // Check if the panel is in DPMS OFF state and brightness or fps has not changed
+    if (panel->disp_feature->zte_panel_state != SDE_MODE_DPMS_OFF && \
+        (bl_lvl == last_brightness && panel->disp_feature->zte_lcd_cur_fps != last_fps)) {
+        pr_info("MSM_LCD backlight not set when panel vid fps does not change\n");
+        return rc;
+    }
+
+
+	if (unlikely(panel->bl_config.lp_mode)) {
+		mode_flags = dsi->mode_flags;
+		dsi->mode_flags |= MIPI_DSI_MODE_LPM;
+	}
+
+	// Invert the brightness value if necessary
+	if (panel->bl_config.bl_inverted_dbv)
+		bl_lvl = (((bl_lvl & 0xff) << 8) | (bl_lvl >> 8));
+
+	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl);
+	if (rc < 0)
+		DSI_ERR("failed to update dcs backlight:%d\n", bl_lvl);
+
+	// Restore the display mode flags if necessary
+	if (unlikely(panel->bl_config.lp_mode))
+		dsi->mode_flags = mode_flags;
+
+	if (bl_lvl == 0) {
+		need_dim = false;
+	}
+	// Schedule a delayed work to dim the display if needed
+	if (need_dim) {
+		need_dim = false;
+		frame_time_us = mult_frac(1000, 1000, panel->cur_mode->timing.refresh_rate);
+		panel->enter_dim_worked = true;
+		schedule_delayed_work(&panel->dim_work, usecs_to_jiffies(frame_time_us * 2));
+	}
+
+	if (panel->bl_config.bl_inverted_dbv)
+		bl_lvl = (((bl_lvl & 0xff) << 8) | (bl_lvl >> 8));
+
+	if (last_brightness == 0 && bl_lvl != 0)
+	    need_dim = true;
+
+	last_brightness = bl_lvl;
+	last_fps = panel->disp_feature->zte_lcd_cur_fps;
+
+	return rc;
+}
+/* Ended by AICoder, pid:39f29t09c9sed14143c90843f08a896dd515601e */
+
 void zte_lcd_gamespace_bl_limit(struct dsi_panel *panel, u32 bl_limit)
 {
 	u32 bl_bak_store;

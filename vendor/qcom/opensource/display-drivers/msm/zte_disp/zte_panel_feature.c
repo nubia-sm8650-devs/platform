@@ -83,9 +83,6 @@ int zte_hbm_ctrl_display(struct dsi_panel *panel, u32 setHbm, bool from_node){
 		} else {
 			pr_info("MSM_LCD HBM ON: success to send %d cmd.", type);
 		}
-
-        if (atomic_read(&panel->pm_aod))
-            atomic_dec(&panel->pm_aod);
     }
     return err;
 }
@@ -296,7 +293,11 @@ int zte_set_disp_parameter(struct dsi_panel *panel, u32 feature, u32 feature_mod
             break;
         case ZTE_LCD_BL_LIMIT:
             zte_lcd_gamespace_bl_limit(panel,feature_mode);
-            break; 
+            break;
+	    case ZTE_LCD_GESTURE:
+            panel->disp_feature->zte_lcd_gesture = feature_mode;
+            pr_info("MSM_LCD lcd gesture = %d\n", feature_mode);
+            break;
         default:
             pr_info("[MSM_LCD] Unsupported index=%d\n", feature_mode);
             break;

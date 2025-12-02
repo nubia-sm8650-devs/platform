@@ -47,6 +47,12 @@
 #include "sde_vm.h"
 #include "sde_fence.h"
 
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+#include "dsi_display.h"
+#include "dsi_panel.h"
+#include "../dsi/dsi_drm.h"
+// #endif
+
 #define SDE_DEBUG_ENC(e, fmt, ...) SDE_DEBUG("enc%d " fmt,\
 		(e) ? (e)->base.base.id : -1, ##__VA_ARGS__)
 
@@ -5262,12 +5268,25 @@ end:
 // #ifdef CONFIG_ZTE_LCD_HBM
 extern int sde_connector_update_hbm(struct drm_connector *connector, struct sde_encoder_virt *sde_enc);
 // #endif
+
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+extern int dsi_panel_match_fps_pen_setting(struct dsi_panel *panel,
+				struct dsi_display_mode *adj_mode);
+// #endif
+
 void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 {
 	struct sde_encoder_virt *sde_enc;
 	struct sde_encoder_phys *phys;
 	struct sde_kms *sde_kms;
 	unsigned int i;
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+	struct dsi_bridge *dsi_bridge = NULL;
+	struct dsi_display *dsi_display = NULL;
+	struct dsi_display_mode adj_mode;
+	struct drm_bridge *bridge;
+	bool is_vid_mode = false;
+// #endif
 
 	if (!drm_enc) {
 		SDE_ERROR("invalid encoder\n");
@@ -5308,6 +5327,25 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 	/* delay frame kickoff based on expected present time */
 	_sde_encoder_delay_kickoff_processing(sde_enc);
 
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+	is_vid_mode = sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CAP_VID_MODE);
+	if (is_vid_mode) {
+		bridge = drm_bridge_chain_get_first_bridge(drm_enc);
+		if (sde_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_DSI && bridge)
+			dsi_bridge = container_of(bridge, struct dsi_bridge, base);
+		if (dsi_bridge) {
+			adj_mode = dsi_bridge->dsi_mode;
+			dsi_display = dsi_bridge->display;
+			if (dsi_display && dsi_display->panel && dsi_display->panel->zte_hfp_vfp_vid_switch && \
+				(adj_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR)) {
+					mutex_lock(&dsi_display->panel->panel_lock);
+					// SDE_INFO("msm_lcd wait_for_active\n");
+					sde_encoder_vid_wait_for_active(drm_enc);
+			}
+		}
+	}
+// #endif
+
 	/* All phys encs are ready to go, trigger the kickoff */
 	_sde_encoder_kickoff_phys(sde_enc, config_changed);
 
@@ -5321,6 +5359,17 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 	if (sde_enc->autorefresh_solver_disable &&
 			!_sde_encoder_is_autorefresh_enabled(sde_enc))
 		_sde_encoder_update_rsc_client(drm_enc, true);
+
+// #ifdef CONFIG_ZTE_LCD_HIMAX_PANEL zte_hfp_vfp_vid_switch
+	if (is_vid_mode) {
+		if (dsi_display && dsi_display->panel && dsi_display->panel->zte_hfp_vfp_vid_switch && \
+			(adj_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR)) {
+			// SDE_INFO("msm_lcd fps_pen_setting\n");
+			dsi_panel_match_fps_pen_setting(dsi_display->panel, &adj_mode);
+			mutex_unlock(&dsi_display->panel->panel_lock);
+		}
+	}
+// #endif
 
 	SDE_ATRACE_END("encoder_kickoff");
 }
@@ -6196,6 +6245,37 @@ fail:
 		sde_encoder_destroy(drm_enc);
 
 	return ERR_PTR(ret);
+}
+
+int sde_encoder_vid_wait_for_active(
+			struct drm_encoder *drm_enc)
+{
+	struct drm_display_mode mode;
+	struct sde_encoder_virt *sde_enc = NULL;
+	u32 ln_cnt, min_ln_cnt, active_mark_region;
+	u32 i, retry = 15;
+	if (!drm_enc) {
+		SDE_ERROR("invalid encoder\n");
+		return -EINVAL;
+	}
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
+		if (!phys || (phys->ops.is_master && !phys->ops.is_master(phys)))
+			continue;
+		mode = phys->cached_mode;
+		min_ln_cnt = (mode.vtotal - mode.vsync_start) +
+			(mode.vsync_end - mode.vsync_start);
+		active_mark_region = mode.vdisplay + min_ln_cnt - mode.vdisplay / 4;
+		while (retry) {
+			ln_cnt = phys->ops.get_line_count(phys);
+			if ((ln_cnt > min_ln_cnt) && (ln_cnt < active_mark_region))
+				return 0;
+			udelay(2000);
+			retry--;
+		}
+	}
+	return -EINVAL;
 }
 
 int sde_encoder_wait_for_event(struct drm_encoder *drm_enc,
