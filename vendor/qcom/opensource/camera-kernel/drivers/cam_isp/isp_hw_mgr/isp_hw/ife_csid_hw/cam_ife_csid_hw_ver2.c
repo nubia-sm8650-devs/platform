@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iopoll.h>
@@ -65,6 +65,10 @@ static void cam_ife_csid_ver2_print_debug_reg_status(
 static int cam_ife_csid_ver2_print_hbi_vbi(
 	struct cam_ife_csid_ver2_hw  *csid_hw,
 	struct cam_isp_resource_node *res);
+
+static void cam_ife_csid_ver2_maskout_all_irqs(
+	struct cam_ife_csid_ver2_hw *csid_hw,
+	struct cam_csid_hw_stop_args *csid_stop);
 
 static bool cam_ife_csid_ver2_cpas_cb(
 	uint32_t handle, void *user_data, struct cam_cpas_irq_data *irq_data)
@@ -2023,6 +2027,7 @@ static int cam_ife_csid_ver2_ipp_bottom_half(
 	struct cam_hw_info                           *hw_info;
 	struct cam_ife_csid_ver2_path_cfg            *path_cfg;
 	struct cam_isp_sof_ts_data                    sof_and_boot_time;
+	struct cam_csid_hw_stop_args                  csid_stop;
 	uint32_t                                      irq_status_ipp;
 	uint32_t                                      err_mask;
 	uint32_t                                      err_type = 0;
@@ -2141,6 +2146,13 @@ static int cam_ife_csid_ver2_ipp_bottom_half(
 		if (out_of_sync_fatal)
 			err_type = CAM_ISP_HW_ERROR_CSID_SENSOR_FRAME_DROP;
 
+		/* Mask off all the irqs for Fatal errors */
+		if (irq_status_ipp & path_reg->fatal_err_mask) {
+			csid_stop.num_res = 1;
+			csid_stop.node_res = &res;
+			cam_ife_csid_ver2_maskout_all_irqs(csid_hw, &csid_stop);
+		}
+
 		cam_ife_csid_ver2_handle_event_err(csid_hw,
 			irq_status_ipp, err_type, false, res);
 	}
@@ -2166,6 +2178,7 @@ static int cam_ife_csid_ver2_ppp_bottom_half(
 	struct cam_isp_resource_node                 *res;
 	struct cam_ife_csid_ver2_hw                  *csid_hw = NULL;
 	struct cam_hw_info                           *hw_info;
+	struct cam_csid_hw_stop_args                  csid_stop;
 	uint32_t                                      irq_status_ppp;
 	uint32_t                                      err_mask;
 	uint32_t                                      err_type = 0;
@@ -2220,12 +2233,20 @@ static int cam_ife_csid_ver2_ppp_bottom_half(
 		csid_hw, res, CAM_IFE_CSID_IRQ_REG_PPP,
 		err_mask, irq_status_ppp, payload);
 
-	if (err_type)
+	if (err_type) {
+		/* Mask off all the irqs for Fatal errors */
+		if (irq_status_ppp & path_reg->fatal_err_mask) {
+			csid_stop.num_res = 1;
+			csid_stop.node_res = &res;
+			cam_ife_csid_ver2_maskout_all_irqs(csid_hw, &csid_stop);
+		}
+
 		cam_ife_csid_ver2_handle_event_err(csid_hw,
 			irq_status_ppp,
 			err_type,
 			false,
 			res);
+	}
 unlock:
 	spin_unlock(&csid_hw->lock_state);
 end:
@@ -2247,6 +2268,7 @@ static int cam_ife_csid_ver2_rdi_bottom_half(
 	struct cam_isp_resource_node                 *res;
 	const struct cam_ife_csid_ver2_path_reg_info *rdi_reg;
 	struct cam_hw_info                           *hw_info;
+	struct cam_csid_hw_stop_args                  csid_stop;
 	uint32_t                                      irq_status_rdi;
 	uint32_t                                      err_mask;
 	uint32_t                                      err_type = 0;
@@ -2317,6 +2339,13 @@ static int cam_ife_csid_ver2_rdi_bottom_half(
 
 	spin_unlock(&csid_hw->lock_state);
 	if (err_type) {
+		/* Mask off all the irqs for Fatal errors */
+		if (irq_status_rdi & rdi_reg->fatal_err_mask) {
+			csid_stop.num_res = 1;
+			csid_stop.node_res = &res;
+			cam_ife_csid_ver2_maskout_all_irqs(csid_hw, &csid_stop);
+		}
+
 		cam_ife_csid_ver2_handle_event_err(csid_hw,
 			irq_status_rdi, err_type, false, res);
 		goto end;
